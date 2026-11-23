@@ -17,3 +17,22 @@ Description: Graphical APT updater for desktop applications
  retry items that failed to download. Optional reminders use a systemd
  user timer.
 
+Package: software-update-center
+Architecture: all
+Version: 0.4.0
+Priority: optional
+Section: admin
+Maintainer: jinranh <92495065+jinranh@users.noreply.github.com>
+Depends: apt, sudo, gpg, ca-certificates, appstream, python3 (>= 3.10), python3-apt, python3-gi, gir1.2-gtk-3.0, gnome-terminal, libnotify-bin
+Filename: pool/main/s/software-update-center/software-update-center_0.4.0_all.deb
+Size: 33874
+MD5sum: 5c36c2569152ccd2a7d6e06433f149d0
+SHA1: 144896ac40612fc9e9b321bb1dfae05c54b29616
+SHA256: 49adfce5f961baead6cb69c78416c441ceac9f9a1a36a388b7ad36bba4488208
+SHA512: a41f459e3d1c2393f1a051220f1853480df160803c240980c245f0cc7a15a78dc48624e0e1b8512b235344051a427dd2c98c4dd5c9f4bd36cf74619c2f672970
+Homepage: https://github.com/jinranh/software-update-center
+Description: Find, install and update desktop applications
+ Browse a curated catalog, verify vendor APT sources, and manage available
+ updates in one place. Preview dependencies before applying changes.
+ Optional desktop reminders use a systemd user timer.
+
