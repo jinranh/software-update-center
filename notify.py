@@ -13,6 +13,13 @@ import catalog
 ROOT = Path(__file__).resolve().parent
 
 
+def open_updates():
+    # The timer's service stops its whole cgroup when the notifier exits.
+    subprocess.run(['/usr/bin/systemd-run', '--user', '--collect', '--quiet', '--service-type=exec',
+                    '/usr/bin/python3', str(ROOT / 'app.py'), '--updates'],
+                   check=True, timeout=10)
+
+
 def notify(state):
     available = [row for row in state['apps'] if row['available']]
     if not available:
@@ -25,10 +32,13 @@ def notify(state):
         if values[0] != notification_id[0]:
             return
         if signal == 'ActionInvoked':
-            if values[1] in ('default', 'open'):
-                subprocess.Popen(['/usr/bin/python3', str(ROOT / 'app.py'), '--updates'],
-                                 stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-            loop.quit()
+            try:
+                if values[1] in ('default', 'open'):
+                    open_updates()
+            except (OSError, subprocess.SubprocessError) as error:
+                print(error, file=sys.stderr)
+            finally:
+                loop.quit()
         elif signal == 'NotificationClosed':
             loop.quit()
     subscription = bus.signal_subscribe('org.freedesktop.Notifications',

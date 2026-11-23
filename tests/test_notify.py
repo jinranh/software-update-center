@@ -6,6 +6,15 @@ import notify
 
 
 class NotificationTests(unittest.TestCase):
+    def test_notification_launches_updates_outside_the_timer_service(self):
+        with patch('notify.subprocess.run') as run:
+            notify.open_updates()
+        args, options = run.call_args
+        self.assertEqual(args[0][:2], ['/usr/bin/systemd-run', '--user'])
+        self.assertIn('--service-type=exec', args[0])
+        self.assertEqual(args[0][-1], '--updates')
+        self.assertTrue(options['check'])
+
     def test_report_includes_verified_vendor_candidates_when_system_refresh_fails(self):
         def run(command, timeout):
             args = command[2:]
