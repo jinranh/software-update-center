@@ -21,13 +21,13 @@ SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
 | ChatGPT | OpenAI / `chatgpt` | 卡片显示 Linux 预览及官方入口。Ubuntu 支持版本为 24.04 和 26.04，官方 DEB 在支持平台配置签名 APT 源。[OpenAI Linux 安装指南](https://learn.chatgpt.com/docs/linux/linux-app) |
 | Claude Desktop | Anthropic / `claude-desktop` | 使用 Anthropic 签名 APT 源安装和更新。[系统要求、软件源及指纹](https://support.claude.com/en/articles/10065433-install-claude-desktop) |
 | Visual Studio Code | Microsoft / `code` | 使用 Microsoft 签名 APT 源安装和更新。[软件源说明](https://code.visualstudio.com/docs/setup/linux) · [签名指纹](https://learn.microsoft.com/en-us/linux/packages) |
-| Google Chrome | Google / `google-chrome-stable` | 使用 Google 签名 APT 源安装和更新。Chrome 安装器管理 `google-chrome.sources`。检测到旧式源或重复源会显示对应文件，需先在系统中核对并归并为唯一的官方源。[系统要求](https://support.google.com/chrome/answer/95346) · [签名指纹](https://www.google.com/linuxrepositories/) |
+| Google Chrome | Google / `google-chrome-stable` | 使用 Google 签名 APT 源安装和更新。Chrome 安装器管理 `google-chrome.sources`。常见的新旧官方源重复配置可在卡片里审查并修复。授权后保留已验证的新源，旧文件会备份并停用。[系统要求](https://support.google.com/chrome/answer/95346) · [签名指纹](https://www.google.com/linuxrepositories/) |
 | 飞书 | 北京飞书科技有限公司 / `bytedance-feishu-stable` | 从官网下载 Linux DEB。升级时可在客户端检查版本，或从官网获取新版 DEB 覆盖安装。[下载](https://www.feishu.cn/download) · [升级说明](https://www.feishu.cn/hc/zh-CN/articles/360043828013) |
 | Docker Desktop | Docker / `docker-desktop` | 当前 Ubuntu 安装指南列出 24.04 和 26.04。Desktop 使用官方 DEB 换包，安装指南里的 Docker Engine 仓库用于依赖。[Ubuntu 安装及升级](https://docs.docker.com/desktop/setup/install/linux/ubuntu/) |
 
 渠道复核日期为 2026-11-23。新增产品时，在 [catalog.py](catalog.py) 记录包名、支持平台、官方证据和签名信息。AppStream 仅补充匹配组件 ID 与软件包记录的摘要。dpkg 同名包的版本会标为本机版本，首次通过本工具替换时会在确认框说明原发布者未核实。
 
-官方 APT 操作先刷新所选厂商源并验证指纹，使用本机已取得的 APT 索引解析依赖。下载前会展示 APT 选中的 URL 和版本，授权后重新核对计划。其他源提供同名包、依赖计划变化、签名异常、版本锁定或降级会阻止操作并显示原因。系统软件源刷新失败时，厂商源仍独立检查，有可用更新的应用仍会出现在「更新」页。缺少依赖索引时，安装计划会显示 APT 的具体错误。
+官方 APT 操作先刷新所选厂商源并验证指纹，使用本机已取得的 APT 索引解析依赖。下载前会展示 APT 选中的 URL 和版本，授权后重新核对计划。其他源提供同名包、依赖计划变化、签名异常、版本锁定或降级会阻止操作并显示原因。系统软件源刷新失败时，厂商源仍独立检查。「更新」页也会从一份新取得的签名索引查找普通更新，满足依赖条件的项目可以逐项审查后安装。未刷新的旧索引不会用于这条路径。授权后会重新核对候选版本、下载地址和依赖。
 
 ## 快速开始
 
@@ -42,6 +42,48 @@ SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
 
    APT 会从系统软件源补齐缺少的依赖，包括 Python 和 GTK。下载缺少的依赖需要联网。
 3. 安装完成后，在应用菜单搜索 **软件更新**。
+
+以后可用同样的命令覆盖安装新版 DEB。想在应用内收到新版，也可以[启用项目 APT 源](#启用应用自身的-apt-更新)。
+
+### 从旧源码安装迁移到 DEB
+
+这段迁移只适用于以前运行过 `./setup.sh` 的用户。直接安装 DEB 的用户按上面的步骤更新即可。
+
+关闭正在运行的「软件更新」，先按快速开始安装新版 DEB。然后在当前桌面用户的终端中备份旧程序、启动入口和定时任务。旧提醒已启用时，迁移会启用 DEB 版的定时任务。
+
+```bash
+(
+  set -e
+  backup="$(mktemp -d "$HOME/software-update-center-backup.XXXXXX")"
+  user_units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  timer=software-update-check.timer
+
+  if systemctl --user is-enabled --quiet "$timer"; then
+    restore_timer=yes
+    systemctl --user disable --now "$timer"
+  else
+    restore_timer=no
+    systemctl --user stop "$timer"
+  fi
+  systemctl --user stop software-update-check.service
+
+  for old in "$HOME/.local/share/software-update-center" \
+      "${XDG_DATA_HOME:-$HOME/.local/share}/applications/software-update-center.desktop" \
+      "$user_units/software-update-check.service" "$user_units/$timer"; do
+    if [ -e "$old" ] || [ -L "$old" ]; then
+      mv -- "$old" "$backup/"
+    fi
+  done
+
+  systemctl --user daemon-reload
+  if [ "$restore_timer" = yes ]; then
+    systemctl --user enable --now "$timer"
+  fi
+  printf '%s\n' "$backup"
+)
+```
+
+重新从应用菜单打开「软件更新」。如果 GNOME 仍缓存旧入口，注销并重新登录即可刷新。也可以先运行 `/usr/bin/python3 /usr/lib/software-update-center/app.py` 打开 DEB 版。
 
 ## 从源码运行或安装
 
@@ -68,7 +110,7 @@ SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
 
 ## 启用应用自身的 APT 更新
 
-第一次只需安装一次 [软件源配置包](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center-apt-source.deb)：
+如果希望通过 APT 更新应用本身，可以安装一次 [软件源配置包](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center-apt-source.deb)：
 
 ```bash
 sudo apt install ./software-update-center-apt-source.deb
@@ -76,7 +118,7 @@ sudo apt install ./software-update-center-apt-source.deb
 
 此包会配置项目的签名 APT 源。在「更新」页点击 **检查更新** 后，已通过 DEB 安装的「软件更新」自身有新版时，也会出现在列表中。点击 **更新** 并确认即可升级。升级后关闭并重新打开窗口。
 
-如果之前用 `setup.sh` 安装过，请先按下文的源码版卸载步骤移除旧的用户级启动入口和定时任务，再安装 DEB。停用此软件源可运行 `sudo apt purge software-update-center-apt-source`。
+已启用项目源的用户直接检查更新即可。停用此软件源可运行 `sudo apt purge software-update-center-apt-source`。
 
 ## 怎么用
 

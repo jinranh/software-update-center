@@ -28,6 +28,48 @@ Tested on **Ubuntu 22.04 LTS with GNOME**.
    APT installs missing dependencies, including Python and GTK, from your configured system repositories. An internet connection is required to download missing dependencies.
 3. Open **Software Update Center** (软件更新) from the applications menu.
 
+To upgrade manually, install the newer DEB with the same command. You can also [enable the project's APT source](#enable-updates-for-the-updater-itself) to receive app updates.
+
+### Migrate from an older source installation to the DEB
+
+Follow these steps only if you previously installed with `./setup.sh`. For an existing DEB installation, use the usual upgrade steps above.
+
+Close Software Update Center and install the new DEB first. Then, from your desktop user's terminal, back up the old program, menu entry and user units. If the old timer was enabled, this also enables the timer supplied by the DEB.
+
+```bash
+(
+  set -e
+  backup="$(mktemp -d "$HOME/software-update-center-backup.XXXXXX")"
+  user_units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  timer=software-update-check.timer
+
+  if systemctl --user is-enabled --quiet "$timer"; then
+    restore_timer=yes
+    systemctl --user disable --now "$timer"
+  else
+    restore_timer=no
+    systemctl --user stop "$timer"
+  fi
+  systemctl --user stop software-update-check.service
+
+  for old in "$HOME/.local/share/software-update-center" \
+      "${XDG_DATA_HOME:-$HOME/.local/share}/applications/software-update-center.desktop" \
+      "$user_units/software-update-check.service" "$user_units/$timer"; do
+    if [ -e "$old" ] || [ -L "$old" ]; then
+      mv -- "$old" "$backup/"
+    fi
+  done
+
+  systemctl --user daemon-reload
+  if [ "$restore_timer" = yes ]; then
+    systemctl --user enable --now "$timer"
+  fi
+  printf '%s\n' "$backup"
+)
+```
+
+Reopen Software Update Center from the applications menu. If GNOME still uses the cached launcher, sign out and back in to refresh it. In the meantime you can launch the DEB version with `/usr/bin/python3 /usr/lib/software-update-center/app.py`.
+
 ## Run or install from source
 
 Tested on **Ubuntu 22.04 LTS with GNOME**. Run these commands from a terminal in your GNOME session. You'll need local administrator privileges to install updates.
@@ -53,7 +95,7 @@ Tested on **Ubuntu 22.04 LTS with GNOME**. Run these commands from a terminal in
 
 ## Enable updates for the updater itself
 
-Install the separate [APT source package](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center-apt-source.deb) once:
+To get updates for the app itself through APT, install the separate [APT source package](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center-apt-source.deb) once:
 
 ```bash
 sudo apt install ./software-update-center-apt-source.deb
@@ -61,7 +103,7 @@ sudo apt install ./software-update-center-apt-source.deb
 
 This opts in to the project's signed APT source. If you installed the updater as a DEB, its new versions will appear in the app after **Check for updates**. Select the upgrade on the Updates page and confirm it, then close and reopen the updater.
 
-If you previously used `setup.sh`, follow the source uninstall instructions below to remove the old user launcher and timer before installing the DEB. To remove the APT source, run `sudo apt purge software-update-center-apt-source`.
+If you've already enabled the project's source, check for updates as usual. To remove the APT source, run `sudo apt purge software-update-center-apt-source`.
 
 ## Use the updater
 
@@ -70,7 +112,7 @@ If you previously used `setup.sh`, follow the source uninstall instructions belo
 3. Follow the terminal prompts to authorize and confirm the installation. Once it finishes, reopen the apps you updated to use their new versions.
 4. If a package times out, other available updates can still finish. The updater shows the reason and selects failed items again. Once the connection recovers, click **Update selected** to retry.
 
-The updater uses your system's existing APT sources. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. The Updates page lists available updates from verified vendor repositories and system APT sources together. The exclusions for Compass and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
+The updater uses your system's existing APT sources. If a source fails, verified vendor checks continue independently. The Updates page can also review individual ordinary updates using newly downloaded signed indexes. APT candidates, download sources, and dependencies are rechecked after authorization. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. The Updates page lists available updates from verified vendor repositories and system APT sources together. The exclusions for Compass and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
 
 ## Optional update notifications
 

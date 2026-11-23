@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -40,7 +41,7 @@ def refresh():
     (CACHE / 'lists/partial').mkdir(parents=True, exist_ok=True)
     run(['/usr/bin/apt-get', *options(), '-o', 'APT::Update::Error-Mode=any',
          '-o', 'Acquire::Retries=1', '-o', 'Acquire::https::Timeout=20',
-         '-o', 'Acquire::http::Timeout=20', 'update'], timeout=300)
+         '-o', 'Acquire::http::Timeout=20', 'update'], timeout=120)
 
 
 def desktop_apps():
@@ -79,12 +80,15 @@ def collect():
     apt_pkg.config.set('Dir::State::lists', str(CACHE / 'lists'))
     apt_pkg.config.set('Dir::Cache::pkgcache', '')
     apt_pkg.config.set('Dir::Cache::srcpkgcache', '')
-    cache = apt.Cache()
+    return collect_cache(apt.Cache())
+
+
+def collect_cache(cache, accept=None):
     rows = []
     for name, title in desktop_apps().items():
         if name not in catalog.PACKAGES and name in cache:
             record = app_record(cache[name], title)
-            if record:
+            if record and (accept is None or accept(cache[name].candidate)):
                 rows.append(record)
     return sorted(rows, key=lambda row: (not row['available'], row['name'].lower()))
 
@@ -97,12 +101,23 @@ def check():
         except BlockingIOError:
             raise RuntimeError('另一个检查任务正在运行，请稍后重试。')
         try:
-            refresh()
-            state = dict(checked_at=time.time(), apps=collect())
+            try:
+                refresh()
+                state = dict(checked_at=time.time(), apps=collect())
+            except (RuntimeError, subprocess.TimeoutExpired) as error:
+                from partial_apt import save_snapshot
+                snapshot, apps, notice = save_snapshot()
+                state = dict(checked_at=time.time(), apps=apps, partial_snapshot=snapshot,
+                             partial_error=notice or str(error))
             temp = CACHE / 'state.tmp'
             temp.write_text(json.dumps(state, ensure_ascii=False))
             temp.replace(CACHE / 'state.json')
             (CACHE / 'last-error.txt').unlink(missing_ok=True)
+            from partial_apt import SNAPSHOT
+            for path in CACHE.iterdir():
+                if (SNAPSHOT.fullmatch(path.name) and path.name != state.get('partial_snapshot')
+                        and path.is_dir() and not path.is_symlink()):
+                    shutil.rmtree(path, ignore_errors=True)
             return state
         except Exception as error:
             (CACHE / 'last-error.txt').write_text(str(error))
@@ -174,7 +189,11 @@ if __name__ == '__main__':
             with (CACHE / 'check.lock').open('w') as lock:
                 fcntl.flock(lock, fcntl.LOCK_SH)
                 state = json.loads((CACHE / 'state.json').read_text())
-                state['apps'] = collect()
+                if state.get('partial_snapshot'):
+                    from partial_apt import collect_snapshot, snapshot_path
+                    state['apps'] = collect_snapshot(snapshot_path(state['partial_snapshot']))
+                else:
+                    state['apps'] = collect()
             print(json.dumps(state, ensure_ascii=False))
         elif sys.argv[1:2] == ['--preview']:
             print(preview(sys.argv[2:]))

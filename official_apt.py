@@ -22,6 +22,7 @@ import apt_pkg
 
 import backend
 import catalog
+import chrome_source
 
 
 apt_pkg.init()
@@ -32,6 +33,8 @@ KEYRINGS = Path('/etc/apt/keyrings')
 RECEIPTS = Path('/var/lib/software-update-center/official')
 LOCK = RECEIPTS.parent / 'official.lock'
 APT_SECURITY = ['-o', 'Acquire::AllowInsecureRepositories=false',
+                '-o', 'Acquire::AllowWeakRepositories=false',
+                '-o', 'APT::Authentication::TrustCDROM=false',
                 '-o', 'Acquire::AllowDowngradeToInsecureRepositories=false',
                 '-o', 'APT::Get::AllowUnauthenticated=false',
                 '-o', 'Acquire::Check-Valid-Until=true',
@@ -55,7 +58,8 @@ class Source:
 
     @property
     def enabled(self):
-        return self.fields.get('enabled', 'yes').lower() not in ('no', 'false', '0')
+        return (self.path.suffix != '.sources'
+                or apt_pkg.string_to_bool(self.fields.get('enabled', 'yes')) != 0)
 
     @property
     def key(self):
@@ -208,6 +212,12 @@ def package_archives(cache, version):
                index.is_trusted, index.archive_uri('').rstrip('/'), Path(package_file.filename).name)
 
 
+def weakened_origin(origin, weak):
+    # APT's on-disk index id can alias different transports (HTTP and HTTPS).
+    index_key = apt_pkg.uri_to_filename(origin.rstrip('/') + '/')
+    return any(apt_pkg.uri_to_filename(item.rstrip('/') + '/') == index_key for item in weak)
+
+
 def authenticated_version(cache, version, repo, source_uri, fresh_indexes):
     return any(trusted and digest and origin == source_uri.rstrip('/') and repo.owns(uri, source_uri)
                and (fresh_indexes is None or index in fresh_indexes)
@@ -252,7 +262,7 @@ def changes_from_simulation(output):
 
 
 class Session:
-    def __init__(self, app, scratch, arch):
+    def __init__(self, app, scratch, arch, *, paths=None):
         self.app = app
         self.repo = app.repo
         self.arch = arch
@@ -267,7 +277,7 @@ class Session:
         self.key_home.mkdir(mode=0o700)
         self.parts.chmod(0o700)
         self.lists.chmod(0o700)
-        paths = source_paths()
+        paths = source_paths() if paths is None else paths
         self.weakened = weakened_sources(paths)
         self.source = configured_source(self.repo, paths, arch)
         self.uri = self.source.uris[0] if self.source else self.repo.uri
@@ -349,21 +359,23 @@ class Session:
             changes = changes_from_simulation(simulation)
             if not changes or not any(name.split(':')[0] == self.app.package for name, *_ in changes):
                 raise RuntimeError('APT 依赖计划没有安装或更新所选应用。')
-            archive_records = {}
-            protected = catalog.PACKAGES - {self.app.package}
-            for name, installed, version, package_arch in changes:
-                if name.split(':')[0] in protected:
-                    raise RuntimeError(f'依赖计划涉及另一个官方目录软件包：{name}')
-                if installed and apt_pkg.version_compare(version, installed) < 0:
-                    raise RuntimeError(f'依赖计划包含降级：{name} {installed} → {version}')
-                pkg = cache[name] if ':' in name or package_arch == 'all' else cache[f'{name}:{package_arch}']
-                for uri, digest, trusted, origin, index in package_archives(cache, pkg.versions[version]):
-                    archive_records.setdefault(uri, set()).add(
-                        (name, installed or '', version, package_arch, digest, trusted, origin, index))
-            manifest = self.manifest(command, changes, archive_records)
+            manifest = self.review_archives(cache, command, changes, catalog.PACKAGES - {self.app.package})
             return {'package': self.app.package, 'previous': previous, 'version': target.version,
                     'spec': spec, 'source': self.uri, 'fingerprint': self.repo.fingerprint,
                     'archives': manifest}
+
+    def review_archives(self, cache, command, changes, protected):
+        archive_records = {}
+        for name, installed, version, package_arch in changes:
+            if name.split(':')[0] in protected:
+                raise RuntimeError(f'依赖计划涉及受保护的软件包：{name}')
+            if installed and apt_pkg.version_compare(version, installed) < 0:
+                raise RuntimeError(f'依赖计划包含降级：{name} {installed} → {version}')
+            pkg = cache[name] if ':' in name or package_arch == 'all' else cache[f'{name}:{package_arch}']
+            for uri, digest, trusted, origin, index in package_archives(cache, pkg.versions[version]):
+                archive_records.setdefault(uri, set()).add(
+                    (name, installed or '', version, package_arch, digest, trusted, origin, index))
+        return self.manifest(command, changes, archive_records)
 
     def manifest(self, command, changes, archive_records):
         manifest = []
@@ -384,10 +396,10 @@ class Session:
             if len(records) != 1 or Path(filename).name != filename or not size.isdecimal():
                 raise RuntimeError(f'APT 下载地址与依赖计划不一致：{uri}')
             name, previous, version, arch, digest, trusted, origin = records.pop()
-            if (not trusted or origin in self.weakened
+            if (not trusted or weakened_origin(origin, self.weakened)
                     or not re.fullmatch(r'[0-9a-f]{64}', digest)):
                 raise RuntimeError(f'依赖缺少已认证的 APT 索引或 SHA-256：{uri}')
-            if name.split(':')[0] == self.app.package and (
+            if self.app is not None and name.split(':')[0] == self.app.package and (
                     origin != self.uri.rstrip('/') or not self.repo.owns(uri, self.uri)
                     or any(record[-1] not in self.vendor_indexes for record in candidates)):
                 raise RuntimeError(f'APT 选择了其他发布者的下载地址：{uri}')
@@ -487,6 +499,12 @@ def status():
                             row['error'] = str(error)
         except RuntimeError as error:
             row['error'] = str(error)
+            if app.id == 'chrome' and '重复厂商软件源' in row['error']:
+                try:
+                    inspect_chrome_repair(paths, system[2])
+                    row['repair'] = True
+                except (OSError, RuntimeError) as reason:
+                    row['error'] += '\n' + str(reason)
     return {'system': system, 'apps': output}
 
 
@@ -562,6 +580,16 @@ def execute(session, expected, runner):
     if plan_digest(plan) != expected:
         raise RuntimeError('APT 候选包、下载来源或依赖已变化。请返回窗口重新审查。')
     command = [*session.commands(), *INSTALL, 'install', plan['spec']]
+    apply_reviewed(session, plan, runner, command, session.plan)
+    if local_version(session.app.package) != plan['version']:
+        raise RuntimeError('dpkg 未报告所选版本已安装。')
+    RECEIPTS.mkdir(mode=0o755, parents=True, exist_ok=True)
+    record = dict(version=plan['version'], md5sums=metadata_digest(session.app.package))
+    atomic_write(RECEIPTS / session.app.id, json.dumps(record).encode())
+    print(f"已核对安装版本：{plan['version']}", flush=True)
+
+
+def apply_reviewed(session, plan, runner, command, review):
     staging = session.scratch / 'downloads'
     staging.mkdir(mode=0o700)
     apt_user = pwd.getpwnam('_apt')
@@ -587,7 +615,7 @@ def execute(session, expected, runner):
                 raise RuntimeError(f"下载结果不是普通文件：{archive['package']}")
             with destination.open('xb') as target:
                 shutil.copyfileobj(stream, target)
-    if session.plan() != plan:
+    if review() != plan:
         raise RuntimeError('下载期间 APT 计划已变化。请返回窗口重新审查。')
     approved = session.archives / 'approved.json'
     approved.write_text(json.dumps(plan['archives']))
@@ -598,16 +626,40 @@ def execute(session, expected, runner):
     if outcome.code:
         changed = next((line for line in outcome.output.splitlines() if line.startswith('APT 锁内')), '')
         raise RuntimeError(changed or 'APT 安装未完成或已取消，详情见终端。')
-    if local_version(session.app.package) != plan['version']:
-        raise RuntimeError('dpkg 未报告所选版本已安装。')
-    RECEIPTS.mkdir(mode=0o755, parents=True, exist_ok=True)
-    record = dict(version=plan['version'], md5sums=metadata_digest(session.app.package))
-    atomic_write(RECEIPTS / session.app.id, json.dumps(record).encode())
-    print(f"已核对安装版本：{plan['version']}", flush=True)
 
 
 def plan_digest(plan):
     return hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
+
+
+def inspect_chrome_repair(paths, arch):
+    return chrome_source.discover(paths, SOURCE_PARTS, catalog.APPS['chrome'].repo, arch,
+                                  source_entries, configured_source)
+
+
+def repair_chrome(app, scratch, arch, expected=None):
+    if app.id != 'chrome':
+        raise ValueError('此修复只适用于 Google Chrome。')
+    paths = source_paths()
+    repair = inspect_chrome_repair(paths, arch)
+    session = Session(app, scratch, arch, paths=[path for path in paths if path != repair.legacy])
+    if session.source is None or session.source.path != repair.canonical:
+        raise RuntimeError('官方 Chrome 软件源已变化，请重新审查。')
+    version = session.check_version()['version']
+    signed_by = '内嵌公钥' if session.source.key.startswith('-----BEGIN') else session.source.key
+    plan = dict(legacy=str(repair.legacy), canonical=str(repair.canonical), backup=str(repair.backup),
+                legacy_hash=repair.legacy_hash, canonical_hash=repair.canonical_hash,
+                signed_by=signed_by, key_hash=sha256_file(session.key_path),
+                source=session.uri, fingerprint=session.repo.fingerprint, version=version)
+    if expected is None:
+        return plan
+    if expected != plan_digest(plan) or repair != inspect_chrome_repair(source_paths(), arch):
+        raise RuntimeError('Chrome 软件源或候选版本已变化，请重新审查。')
+    if sha256_file(source_key(session.source, scratch)) != plan['key_hash']:
+        raise RuntimeError('Chrome 签名密钥已变化，请重新审查。')
+    chrome_source.preserve_legacy(repair)
+    print(f'已停用旧版 Chrome 软件源。原文件已备份至 {repair.backup}。', flush=True)
+    return plan
 
 
 def root_command(operation, app, expected, runner):
@@ -617,6 +669,9 @@ def root_command(operation, app, expected, runner):
     LOCK.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     with LOCK.open('a') as lock, workdir() as scratch:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if operation == 'repair-apply' and re.fullmatch('[0-9a-f]{64}', expected):
+            repair_chrome(app, scratch, arch, expected)
+            return
         session = Session(app, scratch, arch)
         if operation == 'enable':
             activate(session)
@@ -635,14 +690,18 @@ def main(args):
         return
     operation, product, *extra = args
     app = catalog.APPS[product]
-    if operation in ('check', 'plan') and not extra:
+    if operation == 'repair-plan' and not extra:
+        with workdir() as scratch:
+            result = repair_chrome(app, scratch, platform_arch(app))
+            print(json.dumps(result, ensure_ascii=False))
+    elif operation in ('check', 'plan') and not extra:
         with workdir() as scratch:
             session = Session(app, scratch, platform_arch(app))
             if session.source is None:
                 raise RuntimeError('厂商源尚未启用。')
             result = session.check_version() if operation == 'check' else session.plan()
             print(json.dumps(result, ensure_ascii=False))
-    elif (operation == 'enable' and not extra) or (operation == 'apply' and len(extra) == 1):
+    elif (operation == 'enable' and not extra) or (operation in ('apply', 'repair-apply') and len(extra) == 1):
         from install import apt_run
         root_command(operation, app, extra[0] if extra else '', apt_run)
     else:
@@ -654,7 +713,7 @@ if __name__ == '__main__':
         main(sys.argv[1:])
     except (Exception, KeyboardInterrupt) as error:
         message = str(error) or '操作已取消。'
-        if sys.argv[1:2] == ['enable'] or sys.argv[1:2] == ['apply']:
+        if len(sys.argv) > 1 and sys.argv[1] in ('enable', 'apply', 'repair-apply'):
             message = ' '.join(message.splitlines())[-2400:]
         print(message, file=sys.stderr)
         sys.exit(1)

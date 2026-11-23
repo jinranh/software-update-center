@@ -17,7 +17,7 @@ command -v notify-send >/dev/null
 
 install -d "$app_dir" "$launcher_dir" "$unit_dir"
 if [[ "$source_dir" != "$app_dir" ]]; then
-    install -m 644 "$source_dir"/{app.py,backend.py,catalog.py,catalog_view.py,check.conf,official_apt.py,install.py,notify.py} "$app_dir/"
+    install -m 644 "$source_dir"/{app.py,backend.py,catalog.py,catalog_view.py,check.conf,chrome_source.py,partial_apt.py,official_apt.py,install.py,notify.py} "$app_dir/"
 fi
 install -m 644 "$source_dir/desktop/software-update-center.desktop" "$launcher_dir/"
 install -m 644 "$source_dir"/desktop/software-update-check.{service,timer} "$unit_dir/"

@@ -1,0 +1,62 @@
+name: Verify Ubuntu 22.04
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build both DEBs and install the application
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 dbus-x11 desktop-file-utils xauth xvfb
+          bash packaging/build-deb.sh 0.0.0
+          bash packaging/build-apt-source-deb.sh 0.0.0
+          test "$(dpkg-deb -f dist/software-update-center-apt-source.deb Package)" = software-update-center-apt-source
+          test "$(dpkg-deb -f dist/software-update-center-apt-source.deb Version)" = 0.0.0
+          sudo apt-get install -y --no-install-recommends ./dist/software-update-center.deb
+          test "$(dpkg-query -W -f='${Version}' software-update-center)" = 0.0.0
+      - name: Run regression tests under Xvfb
+        run: xvfb-run -a dbus-run-session -- /usr/bin/python3 -m unittest discover -s tests -v
+      - name: Verify the installed launcher and GTK startup
+        run: |
+          launcher=/usr/share/applications/software-update-center.desktop
+          desktop-file-validate "$launcher"
+          grep -Fx 'Exec=/usr/bin/python3 /usr/lib/software-update-center/app.py' "$launcher"
+          xvfb-run -a dbus-run-session -- env SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 - <<'PY'
+          import sys
+          sys.path.insert(0, '/usr/lib/software-update-center')
+          from app import Application, GLib, Window
+
+          Window.check = lambda self: GLib.SOURCE_REMOVE
+          application = Application()
+          opened = []
+
+          def check_window():
+              if application.window:
+                  opened.append(application.window.stack.get_visible_child_name())
+              application.quit()
+              return GLib.SOURCE_REMOVE
+
+          GLib.idle_add(check_window)
+          assert application.run(['app.py', '--updates']) == 0
+          assert opened == ['updates'], opened
+          PY
+
+      - name: Test partial updates against isolated signed APT repositories
+        run: |
+          docker run --rm -v "$PWD:/src:ro" ubuntu:22.04 bash -ec '
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends apt-utils gnupg python3-apt python3-gi
+            printf "y\n" | /usr/bin/python3 /src/tests/integration/partial_sources.py
+          '

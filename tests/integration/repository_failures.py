@@ -29,7 +29,7 @@ def output(*args, cwd=None):
         raise
 
 
-def build_repo(root, package, version, key, *, architecture='amd64', depends=''):
+def build_repo(root, package, version, key, *, architecture='amd64', depends='', desktop=False):
     """Add an inert fixture package and sign the repository index."""
     pool = root / 'pool'
     pool.mkdir(parents=True, exist_ok=True)
@@ -45,6 +45,11 @@ def build_repo(root, package, version, key, *, architecture='amd64', depends='')
         payload = Path(work) / 'usr/share/doc' / package
         payload.mkdir(parents=True)
         (payload / 'readme').write_text('Local APT test fixture.\n')
+        if desktop:
+            launchers = Path(work) / 'usr/share/applications'
+            launchers.mkdir()
+            (launchers / f'{package}.desktop').write_text(
+                f'[Desktop Entry]\nType=Application\nName={package}\nExec=/usr/bin/true\n')
         deb = pool / f'{package}_{version}_{architecture}.deb'
         output('dpkg-deb', '--root-owner-group', '--build', work, str(deb))
     dists = root / 'dists/stable'

@@ -24,6 +24,7 @@ class Window(Gtk.ApplicationWindow):
         self.rows = []
         self.busy = False
         self.preparing = False
+        self.partial_check = False
         self.batch_mode = False
         self.installing = False
         self.valid = False
@@ -177,12 +178,14 @@ class Window(Gtk.ApplicationWindow):
                                      lambda _, app=product: self.catalog.preview(app))
             self.update_content.pack_start(widget, False, False, 0)
         for path, row in native:
-            checkbox = Gtk.CheckButton()
-            checkbox.get_accessible().set_name(f'选择 {row[1]}')
-            checkbox.set_valign(Gtk.Align.CENTER)
-            checkbox.set_active(row[0])
-            checkbox.connect('toggled', self.update_choice, path)
-            self.batch_checks[row[5]] = checkbox
+            checkbox = None
+            if not self.partial_check:
+                checkbox = Gtk.CheckButton()
+                checkbox.get_accessible().set_name(f'选择 {row[1]}')
+                checkbox.set_valign(Gtk.Align.CENTER)
+                checkbox.set_active(row[0])
+                checkbox.connect('toggled', self.update_choice, path)
+                self.batch_checks[row[5]] = checkbox
             failure = row[4] if row[4] != '可更新' else ''
             widget = self.update_row(row[1], row[2], row[3],
                                      lambda _, name=row[5]: self.prepare(names=[name]), checkbox, failure)
@@ -276,6 +279,7 @@ class Window(Gtk.ApplicationWindow):
 
     def render(self, state):
         self.rows = state['apps']
+        self.partial_check = bool(state.get('partial_snapshot'))
         self.model.clear()
         self.valid = True
         failures = self.last_install.get('failures', {})
@@ -289,7 +293,7 @@ class Window(Gtk.ApplicationWindow):
             self.model.append([retry, row['name'], row['installed'], row['candidate'],
                                status, package, row['available']])
         if self.last_install:
-            self.batch_mode = bool(self.selection())
+            self.batch_mode = not self.partial_check and bool(self.selection())
         status = ''
         if self.last_install:
             updated = len(self.last_install.get('updated', []))
@@ -298,9 +302,11 @@ class Window(Gtk.ApplicationWindow):
                 status += f' · {len(failures) + len(pending)} 项可重试'
             if self.last_install.get('message'):
                 status += f' · {self.last_install["message"].splitlines()[-1][:250]}'
+        if self.partial_check:
+            status = (status + '\n' if status else '') + '部分软件源刷新失败。可逐项更新已核验的软件。'
         self.status.set_text(status)
         self.busy = False
-        self.check_error = ''
+        self.check_error = state.get('partial_error', '')
         self.catalog.render()
         return False
 
@@ -353,8 +359,18 @@ class Window(Gtk.ApplicationWindow):
         self.catalog.render()
         def work():
             try:
-                output = backend.preview(specs)
-                GLib.idle_add(self.confirm, specs, output)
+                if self.partial_check:
+                    if len(specs) != 1:
+                        raise RuntimeError('部分软件源刷新失败，请选择单个应用更新。')
+                    import partial_apt
+                    from official_apt import plan_digest
+                    plan = partial_apt.preview(specs[0])
+                    output = '\n\n'.join(f"{item['package']} {item['previous'] or '未安装'} → {item['version']}\n"
+                                         f"{item['uri']}" for item in plan['archives'])
+                    GLib.idle_add(self.confirm, ['--partial', specs[0], plan_digest(plan)], output)
+                else:
+                    output = backend.preview(specs)
+                    GLib.idle_add(self.confirm, specs, output)
             except Exception as error:
                 GLib.idle_add(self.update_failed, str(error))
         threading.Thread(target=work, daemon=True).start()
@@ -371,7 +387,10 @@ class Window(Gtk.ApplicationWindow):
         box = dialog.get_content_area()
         box.set_spacing(12)
         box.set_border_width(16)
-        label = Gtk.Label(label='以下是所选软件及依赖变更（Inst 为安装/升级）。\n输入本机密码后，系统会先下载安装包，再请你确认安装。\n若有下载失败，可安装其余可用项，失败项可回到窗口重试。', xalign=0)
+        message = ('部分软件源无法刷新。以下软件包及下载地址已用新索引核对。授权后会重新核对计划。'
+                   if specs[0] == '--partial' else
+                   '以下是所选软件及依赖变更（Inst 为安装/升级）。\n输入本机密码后，系统会先下载安装包，再请你确认安装。\n若有下载失败，可安装其余可用项，失败项可回到窗口重试。')
+        label = Gtk.Label(label=message, xalign=0)
         label.set_line_wrap(True)
         box.pack_start(label, False, False, 0)
         text = Gtk.TextView(editable=False, monospace=True, wrap_mode=Gtk.WrapMode.WORD_CHAR)

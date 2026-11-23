@@ -188,9 +188,10 @@ def upgrade(specs, runner=apt_run, planner=system_plan, installed=target_install
         return result(1, str(error) or '操作已中断。')
 
 
-def official_helper():
+def official_helper(entrypoint='official_apt.py'):
     installed = Path('/usr/lib/software-update-center')
-    files = ('official_apt.py', 'catalog.py', 'check.conf', 'backend.py', 'install.py')
+    files = ('official_apt.py', 'catalog.py', 'check.conf', 'backend.py', 'install.py',
+             'chrome_source.py', 'partial_apt.py')
     for name in files:
         helper_file = installed / name
         try:
@@ -200,24 +201,48 @@ def official_helper():
             valid = False
         if not valid:
             raise RuntimeError('授权安装官方应用需要同版本 DEB 提供的系统助手。源码窗口可用于只读试用。')
-    return installed / 'official_apt.py'
+    return installed / entrypoint
 
 
 def run_official(args):
     operation, app_id, *extra = args
     app = catalog.APPS[app_id]
+    repair = operation == 'repair-apply' and app.id == 'chrome'
     if (operation == 'enable' and not extra or
-            operation == 'apply' and len(extra) == 1 and re.fullmatch('[0-9a-f]{64}', extra[0])):
-        print('请在此终端授权。APT 下载完成后，如出现安装提示，请核对清单并确认。\n', flush=True)
+            (operation == 'apply' or repair) and len(extra) == 1 and re.fullmatch('[0-9a-f]{64}', extra[0])):
+        prompt = ('请在此终端授权停用旧版 Chrome 软件源。' if repair else
+                  '请在此终端授权。APT 下载完成后，如出现安装提示，请核对清单并确认。')
+        print(prompt + '\n', flush=True)
         outcome = apt_run(['/usr/bin/sudo', '--', '/usr/bin/python3', '-E', '-s',
                            str(official_helper()), operation, app.id, *extra])
+        lines = outcome.output.strip().splitlines()
         if outcome.code:
-            message = outcome.output.strip().splitlines()
             return dict(code=outcome.code, updated=[], failures={}, pending=[],
-                        message=message[-1] if message else '授权或安装未完成，可返回窗口重试。')
+                        message=lines[-1] if lines else '授权未完成，可返回窗口重试。')
+        if repair:
+            return dict(code=0, updated=[], failures={}, pending=[],
+                        message=lines[-1] if lines else '旧版 Chrome 软件源已备份并停用。')
         return dict(code=0, updated=[app.name] if operation == 'apply' else [], failures={}, pending=[],
                     message='厂商源已启用。' if operation == 'enable' else '已核对安装版本。')
     raise ValueError('未知的官方软件操作。')
+
+
+def run_partial(args):
+    spec, digest = args
+    backend.validate_specs([spec])
+    backend.validate_update_route([spec])
+    if not re.fullmatch('[0-9a-f]{64}', digest):
+        raise ValueError('无效的部分更新确认记录。')
+    name = spec.split('=', 1)[0]
+    print('请在此终端授权。将重新刷新、核对并下载所选软件包。', flush=True)
+    outcome = apt_run(['/usr/bin/sudo', '--', '/usr/bin/python3', '-E', '-s',
+                       str(official_helper('partial_apt.py')), spec, digest])
+    if outcome.code == 0 and target_installed(spec):
+        return dict(code=0, updated=[name], failures={}, pending=[], message='已核对安装版本。')
+    reason = outcome.output.strip().splitlines()
+    return dict(code=outcome.code or 1, updated=[],
+                failures={name: reason[-1] if reason else '安装未完成或已取消。'},
+                pending=[], message='')
 
 
 def main():
@@ -236,6 +261,8 @@ def main():
         (backend.CACHE/'install.log').write_text(time.strftime('%Y-%m-%d %H:%M:%S')+'\n')
         if sys.argv[2] == '--official':
             result = run_official(sys.argv[3:])
+        elif sys.argv[2] == '--partial':
+            result = run_partial(sys.argv[3:])
         else:
             backend.validate_update_route(sys.argv[2:])
             print('请在此终端输入本机密码。安装包会先下载，随后请核对 APT 清单并输入 Y。\n', flush=True)

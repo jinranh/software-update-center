@@ -251,7 +251,11 @@ class CatalogView(Gtk.Box):
         card.pack_end(bar, False, False, 0)
         bar.pack_end(action('详情', lambda *_: self.details(app, row)), False, False, 0)
         busy = bool(self.loading or self.active or self.checking or self.window.installing or self.window.preparing)
-        if channel == 'apt' and not row.get('error'):
+        if row.get('repair'):
+            button = action('审查来源修复', lambda *_: self.preview_repair(app), True)
+            button.set_sensitive(not busy)
+            bar.pack_start(button, False, False, 0)
+        elif channel == 'apt' and not row.get('error'):
             if row.get('check_error'):
                 button = action('重试', lambda *_: self.check_versions([app.id]), True)
             elif not row.get('uri'):
@@ -361,6 +365,35 @@ class CatalogView(Gtk.Box):
     def source_enabled(self, app):
         self.state['apps'][app.id]['uri'] = app.repo.uri
         self.preview(app)
+
+    def preview_repair(self, app):
+        if self.loading or self.active or self.checking or self.window.installing or self.window.preparing:
+            return
+        self.active = app.id
+        self.message = '正在单独验证保留的 Google Chrome 软件源……'
+        self.render()
+
+        def work():
+            try:
+                command = ['/usr/bin/python3', str(backend.ROOT / 'official_apt.py'), 'repair-plan', app.id]
+                plan = json.loads(backend.run(command, timeout=190))
+                GLib.idle_add(self.confirm_repair, app, plan)
+            except Exception as error:
+                GLib.idle_add(self.failed_operation, str(error))
+        threading.Thread(target=work, daemon=True).start()
+
+    def confirm_repair(self, app, plan):
+        self.active = None
+        self.message = ''
+        self.render()
+        description = (f'保留 {plan["canonical"]}\n{plan["source"]}\n'
+                       f'Signed-By  {plan["signed_by"]}\n签名指纹  {plan["fingerprint"]}\n'
+                       f'已验证候选版本 {plan["version"]}\n\n停用 {plan["legacy"]}\n'
+                       f'原文件备份至 {plan["backup"]}。')
+        if self.confirm('审查 Chrome 软件源修复', description,
+                        None if backend.PREVIEW else '授权停用旧源'):
+            self.authorize(app, 'repair-apply', plan_digest(plan))
+        return False
 
     def preview(self, app, reinstall=False):
         if self.loading or self.active or self.checking or self.window.installing or self.window.preparing:

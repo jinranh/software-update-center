@@ -17,7 +17,7 @@ units="$stage/usr/lib/systemd/user"
 docs="$stage/usr/share/doc/software-update-center"
 
 install -d "$stage/DEBIAN" "$app" "$desktop" "$units" "$docs" "$root/dist"
-install -m 644 "$root"/{app.py,backend.py,catalog.py,catalog_view.py,check.conf,official_apt.py,install.py,notify.py} "$app/"
+install -m 644 "$root"/{app.py,backend.py,catalog.py,catalog_view.py,check.conf,chrome_source.py,partial_apt.py,official_apt.py,install.py,notify.py} "$app/"
 install -m 644 "$root"/{README.md,README.en.md} "$docs/"
 install -m 644 "$root/desktop/software-update-check.timer" "$units/"
 sed 's@^Exec=.*@Exec=/usr/bin/python3 /usr/lib/software-update-center/app.py@' \
