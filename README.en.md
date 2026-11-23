@@ -42,6 +42,18 @@ Tested on **Ubuntu 22.04 LTS with GNOME**. Run these commands from a terminal in
 
 3. Open **Software Update Center** (软件更新) from the applications menu. To run it directly from the source directory, use `/usr/bin/python3 app.py`.
 
+## Enable updates for the updater itself
+
+Install the separate [APT source package](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center-apt-source.deb) once:
+
+```bash
+sudo apt install ./software-update-center-apt-source.deb
+```
+
+This opts in to the project's signed APT source. If you installed the updater as a DEB, its new versions will appear in the app after **Check for updates**. Select the upgrade and confirm it, then close and reopen the updater.
+
+If you previously used `setup.sh`, follow the source uninstall instructions below to remove the old user launcher and timer before installing the DEB. To remove the APT source, run `sudo apt purge software-update-center-apt-source`.
+
 ## Use the updater
 
 1. Click **Check for updates** (检查更新) to see installed and available versions.
@@ -61,7 +73,7 @@ The timer checks a few minutes after you sign in and around 10:00 each day in yo
 
 ## Upgrade or uninstall the updater
 
-For a DEB installation, download the new `software-update-center.deb` and run `sudo apt install ./software-update-center.deb` from the download directory again. To uninstall the DEB, close the updater, turn off reminders if enabled, and run `sudo apt remove software-update-center`.
+To update the DEB manually, download the new `software-update-center.deb` and run `sudo apt install ./software-update-center.deb` from the download directory again. To uninstall the DEB, close the updater, turn off reminders if enabled, and run `sudo apt remove software-update-center`.
 
 The steps below apply to installations made with `setup.sh`.
 

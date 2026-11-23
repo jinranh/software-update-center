@@ -42,6 +42,18 @@
 
 3. 在应用菜单搜索 **软件更新** 并打开。想直接从源码试用，可以在源码目录运行 `/usr/bin/python3 app.py`。
 
+## 启用应用自身的 APT 更新
+
+第一次只需安装一次 [软件源配置包](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center-apt-source.deb)：
+
+```bash
+sudo apt install ./software-update-center-apt-source.deb
+```
+
+此包会配置项目的签名 APT 源。在「软件更新」里点击 **检查更新** 后，已通过 DEB 安装的「软件更新」自身有新版时，也会出现在列表中。勾选确认即可升级。升级后关闭并重新打开窗口。
+
+如果之前用 `setup.sh` 安装过，请先按下文的源码版卸载步骤移除旧的用户级启动入口和定时任务，再安装 DEB。停用此软件源可运行 `sudo apt purge software-update-center-apt-source`。
+
 ## 怎么用
 
 1. 点击 **检查更新**。列表会显示当前版本和可用版本。
@@ -61,7 +73,7 @@ systemctl --user enable --now software-update-check.timer
 
 ## 更新或卸载工具
 
-通过 DEB 安装时，下载新版的 `software-update-center.deb`，在下载目录重新运行 `sudo apt install ./software-update-center.deb`。要卸载 DEB 版，请先关闭窗口，有启用更新提醒时先关闭提醒，然后运行 `sudo apt remove software-update-center`。
+如果选择手动更新 DEB，下载新版的 `software-update-center.deb`，在下载目录重新运行 `sudo apt install ./software-update-center.deb`。要卸载 DEB 版，请先关闭窗口，有启用更新提醒时先关闭提醒，然后运行 `sudo apt remove software-update-center`。
 
 以下步骤适用于通过 `setup.sh` 安装的版本。
 
