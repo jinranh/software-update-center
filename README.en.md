@@ -1,0 +1,75 @@
+# Software Update Center
+
+[![简体中文](https://img.shields.io/badge/%E9%98%85%E8%AF%BB-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-0969da?style=for-the-badge)](README.md)
+[![English](https://img.shields.io/badge/English-Current%20language-555555?style=for-the-badge)](README.en.md)
+
+Check, select, and upgrade APT-managed desktop apps on Ubuntu from one window. Preview dependency changes before installing. If a batch download fails, the updater tries the selected apps individually, reuses cached packages, and marks apps you can retry.
+
+## Quick start
+
+Tested on **Ubuntu 22.04 LTS with GNOME**. Run these commands from a terminal in your GNOME session. You'll need local administrator privileges to install updates.
+
+1. Install the dependencies and Git.
+
+   ```bash
+   sudo apt update
+   sudo apt install git python3-apt python3-gi gir1.2-gtk-3.0 gnome-terminal libnotify-bin
+   ```
+
+2. Download and install the updater.
+
+   ```bash
+   git clone https://github.com/jinranh/software-update-center.git
+   cd software-update-center
+   ./setup.sh
+   ```
+
+   You can also select **Code → Download ZIP** on the repository page, extract the archive, and run `bash setup.sh` from the extracted directory. You can skip the Git dependency when using the ZIP.
+
+3. Open **Software Update Center** (软件更新) from the applications menu. To run it directly from the source directory, use `/usr/bin/python3 app.py`.
+
+## Use the updater
+
+1. Click **Check for updates** (检查更新) to see installed and available versions.
+2. Select the apps you want, click **Update selected** (更新所选), review the dependency changes, and choose **Continue installation** (继续安装).
+3. Follow the terminal prompts to authorize and confirm the installation. Once it finishes, reopen the apps you updated to use their new versions.
+4. If a package times out, other available updates can still finish. The updater shows the reason and selects failed items again. Once the connection recovers, click **Update selected** to retry.
+
+The updater uses your system's existing APT sources. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. The default exclusions for Feishu, Docker Desktop, Compass, and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
+
+## Optional update notifications
+
+```bash
+systemctl --user enable --now software-update-check.timer
+```
+
+The timer checks a few minutes after you sign in and around 10:00 each day in your local time zone. Click the notification to open the updater and choose which updates to install. To turn off reminders, run `systemctl --user disable --now software-update-check.timer`.
+
+## Upgrade or uninstall the updater
+
+For a Git checkout, run `git pull --ff-only` and then `./setup.sh` from the source directory. For a ZIP installation, download and extract the new archive, then run `bash setup.sh`. Close and reopen the updater to load the new version.
+
+To remove the updater, close its window and run the commands below. They remove the updater's files, menu entry, and timer.
+
+```bash
+systemctl --user disable --now software-update-check.timer
+systemctl --user stop software-update-check.service
+rm -f -- "${XDG_DATA_HOME:-$HOME/.local/share}/applications/software-update-center.desktop"
+rm -f -- "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/software-update-check.service" \
+          "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/software-update-check.timer"
+rm -r -- "$HOME/.local/share/software-update-center"
+systemctl --user daemon-reload
+```
+
+## Troubleshooting and feedback
+
+- **Download timed out.** Retry the failed items once the connection recovers. APT reuses packages it has already downloaded.
+- **Another package manager is busy.** Wait for the system updater or other APT operation to finish. The updater waits for the lock to clear.
+- **Find the logs.** See `~/.cache/software-update-center/install.log` for installations and `journalctl --user -u software-update-check.service` for background checks.
+- **Report an issue.** Include your Ubuntu version, package name, and relevant error in [Issues](https://github.com/jinranh/software-update-center/issues). Remove private details such as account names and internal repository URLs before sharing logs.
+
+To run the tests from a GNOME desktop session:
+
+```bash
+/usr/bin/python3 -m unittest discover -s tests -v
+```
