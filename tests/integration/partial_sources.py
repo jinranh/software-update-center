@@ -15,8 +15,10 @@ import partial_apt
 
 
 def main():
-    if os.geteuid() != 0 or not Path('/.dockerenv').is_file():
-        raise SystemExit('Run only inside a disposable root test container')
+    hosted_runner = (os.environ.get('GITHUB_ACTIONS') == 'true'
+                     and os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted')
+    if os.geteuid() != 0 or not (hosted_runner or Path('/.dockerenv').is_file()):
+        raise SystemExit('Run only as root in a disposable container or GitHub-hosted runner')
     with tempfile.TemporaryDirectory(prefix='suc-partial-fixture-') as directory:
         root = Path(directory)
         root.chmod(0o755)

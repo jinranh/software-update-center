@@ -19,7 +19,7 @@ jobs:
       - name: Build both DEBs and install the application
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends python3 dbus-x11 desktop-file-utils xauth xvfb
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg python3 dbus-x11 desktop-file-utils xauth xvfb
           bash packaging/build-deb.sh 0.0.0
           bash packaging/build-apt-source-deb.sh 0.0.0
           test "$(dpkg-deb -f dist/software-update-center-apt-source.deb Package)" = software-update-center-apt-source
@@ -55,8 +55,5 @@ jobs:
 
       - name: Test partial updates against isolated signed APT repositories
         run: |
-          docker run --rm -v "$PWD:/src:ro" ubuntu:22.04 bash -ec '
-            apt-get update -qq
-            apt-get install -y -qq --no-install-recommends apt-utils gnupg python3-apt python3-gi
-            printf "y\n" | /usr/bin/python3 /src/tests/integration/partial_sources.py
-          '
+          printf 'y\n' | sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT \
+            /usr/bin/python3 -u tests/integration/partial_sources.py
