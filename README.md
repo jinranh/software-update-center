@@ -15,6 +15,8 @@ SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
 
 预览有自己的窗口标识与缓存。可以搜索、读取本机版本、核对已配置的软件源和审查安装计划。常规模式使用 `/usr/bin/python3 app.py`。要试用完整的授权与安装流程，请在隔离 Ubuntu 环境安装本分支构建的 DEB，使用由 root 持有的系统助手。启用和安装均需在窗口确认后到终端授权。
 
+打开窗口后会自动检查已安装且已配置厂商源的应用。卡片显示当前版本以及「已是最新版本」「有更新」或检查失败的原因。点击「安装」或「更新」即可进入确认流程，仓库地址和签名信息也可通过「详情」查看。
+
 | Ubuntu 22.04 amd64 | 发布者 / DEB 包名 | 官方渠道与更新方式 |
 | --- | --- | --- |
 | ChatGPT | OpenAI / `chatgpt` | 卡片显示 Linux 预览及官方入口。Ubuntu 支持版本为 24.04 和 26.04，官方 DEB 在支持平台配置签名 APT 源。[OpenAI Linux 安装指南](https://learn.chatgpt.com/docs/linux/linux-app) |

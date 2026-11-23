@@ -27,12 +27,13 @@ class Window(Gtk.ApplicationWindow):
         self.install_callback = None
         self.last_install = {}
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin=20)
-        shell = Gtk.Box()
+        shell = styled(Gtk.Box(), 'catalog-shell')
+        styled(outer, 'catalog-updates')
         self.add(shell)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         self.catalog = CatalogView(self)
         self.stack.add_titled(self.catalog, 'catalog', '官方应用')
-        self.stack.add_titled(outer, 'updates', '已安装更新')
+        self.stack.add_titled(outer, 'updates', '其他更新')
         sidebar = styled(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=13),
                          'catalog-sidebar')
         brand = Gtk.Label(label='软件更新', xalign=0)
@@ -47,7 +48,7 @@ class Window(Gtk.ApplicationWindow):
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         title = Gtk.Label(xalign=0)
-        title.set_markup('<span size="x-large" weight="bold">已安装更新</span>')
+        title.set_markup('<span size="x-large" weight="bold">其他更新</span>')
         outer.pack_start(title, False, False, 0)
         subtitle = Gtk.Label(label='勾选桌面应用以预览并安装 APT 更新。', xalign=0)
         outer.pack_start(subtitle, False, False, 0)

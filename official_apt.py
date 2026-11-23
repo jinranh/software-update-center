@@ -208,6 +208,12 @@ def package_archives(cache, version):
                index.is_trusted, index.archive_uri('').rstrip('/'), Path(package_file.filename).name)
 
 
+def authenticated_version(cache, version, repo, source_uri, fresh_indexes):
+    return any(trusted and digest and origin == source_uri.rstrip('/') and repo.owns(uri, source_uri)
+               and (fresh_indexes is None or index in fresh_indexes)
+               for uri, digest, trusted, origin, index in package_archives(cache, version))
+
+
 def vendor_candidate(cache, app, source_uri, fresh_indexes=None):
     if app.package not in cache:
         raise RuntimeError('厂商索引没有提供此架构的软件包。')
@@ -219,9 +225,7 @@ def vendor_candidate(cache, app, source_uri, fresh_indexes=None):
     if foreign:
         raise RuntimeError('发现其他来源提供同名软件包 ' + app.package + '：\n' + '\n'.join(foreign[:8]))
     version = package.candidate
-    if version is None or not any(trusted and digest and origin == base and app.repo.owns(uri, source_uri)
-                                  and (fresh_indexes is None or index in fresh_indexes)
-                                  for uri, digest, trusted, origin, index in package_archives(cache, version)):
+    if version is None or not authenticated_version(cache, version, app.repo, source_uri, fresh_indexes):
         if package.is_installed:
             raise RuntimeError(f'APT 候选版本冲突。当前 {package.installed.version}，请核对 APT 优先级和厂商版本。')
         raise RuntimeError('APT 未选择可验证的厂商候选版本，请核对架构和 APT 优先级。')
@@ -309,19 +313,36 @@ class Session:
     def commands(self):
         return [*APT_BASE, *apt_options(self.settings), '-o', 'DPkg::Lock::Timeout=180']
 
+    def candidate(self, cache):
+        package, target = vendor_candidate(cache, self.app, self.uri, self.vendor_indexes)
+        if target.architecture != self.arch:
+            raise RuntimeError(f'APT 候选架构为 {target.architecture}，预期 {self.arch}。')
+        previous = package.installed.version if package.is_installed else ''
+        if previous and apt_pkg.version_compare(target.version, previous) < 0:
+            raise RuntimeError(f'APT 候选版本 {target.version} 低于已安装版本 {previous}。')
+        return package, target, previous
+
+    def check_version(self):
+        with cache_settings(self.settings):
+            cache = apt.Cache(memonly=True)
+            package, target, installed = self.candidate(cache)
+            newest = target.version
+            for version in package.versions:
+                if (version.architecture == self.arch
+                        and apt_pkg.version_compare(version.version, newest) > 0
+                        and authenticated_version(cache, version, self.repo, self.uri, self.vendor_indexes)):
+                    newest = version.version
+            return dict(installed=installed, version=target.version, newest=newest,
+                        official=official_installation(self.app, installed),
+                        held=package._pkg.selected_state == apt_pkg.SELSTATE_HOLD)
+
     def plan(self):
         with cache_settings(self.settings):
             cache = apt.Cache(memonly=True)
-            package, target = vendor_candidate(cache, self.app, self.uri, self.vendor_indexes)
-            _, _, arch = catalog.system()
-            if target.architecture != arch:
-                raise RuntimeError(f'APT 候选架构为 {target.architecture}，预期 {arch}。')
-            previous = package.installed.version if package.is_installed else ''
+            package, target, previous = self.candidate(cache)
             if package._pkg.selected_state == apt_pkg.SELSTATE_HOLD:
                 raise RuntimeError(f'{self.app.package} 已锁定版本。')
-            if previous and apt_pkg.version_compare(target.version, previous) < 0:
-                raise RuntimeError(f'APT 候选版本 {target.version} 低于已安装版本 {previous}。')
-            spec = f'{self.app.package}:{arch}={target.version}'
+            spec = f'{self.app.package}:{self.arch}={target.version}'
             command = [*self.commands(), *INSTALL, 'install', spec]
             simulation = backend.run([*command, '--simulate'])
             backend.validate_plan(simulation)
@@ -614,12 +635,13 @@ def main(args):
         return
     operation, product, *extra = args
     app = catalog.APPS[product]
-    if operation == 'plan' and not extra:
+    if operation in ('check', 'plan') and not extra:
         with workdir() as scratch:
             session = Session(app, scratch, platform_arch(app))
             if session.source is None:
                 raise RuntimeError('厂商源尚未启用。')
-            print(json.dumps(session.plan(), ensure_ascii=False))
+            result = session.check_version() if operation == 'check' else session.plan()
+            print(json.dumps(result, ensure_ascii=False))
     elif (operation == 'enable' and not extra) or (operation == 'apply' and len(extra) == 1):
         from install import apt_run
         root_command(operation, app, extra[0] if extra else '', apt_run)

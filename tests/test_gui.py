@@ -73,8 +73,49 @@ class WindowTests(unittest.TestCase):
                 stack.extend(widget.get_children())
         self.assertTrue(any('OpenAI' in text and 'chatgpt' in text for text in labels))
         self.assertTrue(any('Ubuntu 22.04' in text and '24.04' in text for text in labels))
-        self.assertEqual(set(buttons), {'查看官方入口', '来源与证据'})
+        self.assertEqual(set(buttons), {'查看官方入口', '详情'})
         window.destroy()
+
+    def test_installed_catalog_card_has_clear_version_states_in_preview(self):
+        from unittest.mock import patch
+        window = app.Window()
+        view = window.catalog
+        view.loaded({'system': ('ubuntu', '22.04', 'amd64'), 'apps': {
+            'vscode': dict(channel='apt', installed='1', uri='https://packages.microsoft.com/repos/code')
+        }}, {})
+        view.search.set_text('VS Code')
+        view.render()
+
+        def widgets(widget, kind):
+            if isinstance(widget, kind):
+                yield widget
+            if isinstance(widget, Gtk.Container):
+                for child in widget.get_children():
+                    yield from widgets(child, kind)
+
+        def visible_status():
+            return ' '.join(item.get_text() for item in widgets(view.cards, Gtk.Label))
+
+        self.assertIn('待检查', visible_status())
+        with patch('backend.PREVIEW', True):
+            view.check_result('vscode', dict(installed='1', version='2', newest='2',
+                                            official=False, held=False))
+            self.assertIn('有更新', visible_status())
+            buttons = {item.get_label(): item for item in widgets(view.cards, Gtk.Button)}
+            self.assertIn('更新', buttons)
+            self.assertTrue(buttons['更新'].get_sensitive())
+            view.check_result('vscode', dict(installed='2', version='2', newest='2',
+                                            official=False, held=False))
+            self.assertIn('已是最新版本', visible_status())
+            view.check_result('vscode', dict(installed='2', version='2', newest='3',
+                                            official=False, held=False))
+            self.assertIn('厂商有新版 3', visible_status())
+            self.assertNotIn('已是最新版本', visible_status())
+            view.check_result('vscode', error='网络无法连接')
+            self.assertIn('检查失败', visible_status())
+            self.assertNotIn('已是最新版本', visible_status())
+        window.destroy()
+
 
 
 if __name__=='__main__': unittest.main()
