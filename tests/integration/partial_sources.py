@@ -52,10 +52,11 @@ def main():
         try:
             base = f'http://127.0.0.1:{server.server_port}/healthy'
             good = f'Types: deb\nURIs: {base}\nSuites: stable\nComponents: main\nSigned-By: {key}\n'
-            dead = f'Types: deb\nURIs: http://127.0.0.1:9/offline\nSuites: stable\nComponents: main\nSigned-By: {key}\n'
+            # APT 2.4 shares one connection worker per hostname even across different ports.
+            dead = f'Types: deb\nURIs: http://127.0.0.2:9/offline\nSuites: stable\nComponents: main\nSigned-By: {key}\n'
             sources.write_text(good + '\n' + dead)
             state = backend.check()
-            assert '127.0.0.1:9' in state['partial_error'], state
+            assert '127.0.0.2:9' in state['partial_error'], state
             assert any(row['package'] == name and row['available'] and row['candidate'] == '2.0'
                        for row in state['apps']), state
             plan = partial_apt.preview(f'{name}=2.0')
