@@ -1,0 +1,8 @@
+[Unit]
+Description=Check desktop application updates and notify
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/share/software-update-center/notify.py
+TimeoutStopSec=10
