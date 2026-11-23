@@ -1,0 +1,37 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Architectures: amd64 arm64
+Codename: stable
+Components: main
+Date: Mon, 23 Nov 2026 06:39:30 +0000
+Label: Software Update Center
+Origin: SoftwareUpdateCenter
+Suite: stable
+MD5Sum:
+ be6fb950ddbfa9c46da4bbb5c3513cd3              942 main/binary-amd64/Packages
+ bedc068bf086b9754ce1b9a6d741ae72              619 main/binary-amd64/Packages.gz
+ be6fb950ddbfa9c46da4bbb5c3513cd3              942 main/binary-arm64/Packages
+ bedc068bf086b9754ce1b9a6d741ae72              619 main/binary-arm64/Packages.gz
+SHA1:
+ 9f9688db9e7cc0fdf636a5065b6366fa54394bf0              942 main/binary-amd64/Packages
+ e442f40c2c68b66fd7656ea6f8178584b99a51d6              619 main/binary-amd64/Packages.gz
+ 9f9688db9e7cc0fdf636a5065b6366fa54394bf0              942 main/binary-arm64/Packages
+ e442f40c2c68b66fd7656ea6f8178584b99a51d6              619 main/binary-arm64/Packages.gz
+SHA256:
+ 3eaeacdb6072bb1c91b6c13917c248c610a8df05e5b5b1c659755f653b1c1bbb              942 main/binary-amd64/Packages
+ 03d5bea97814dffc0d05a13880226156aa8ebeac226eee1718745ca56f92fef4              619 main/binary-amd64/Packages.gz
+ 3eaeacdb6072bb1c91b6c13917c248c610a8df05e5b5b1c659755f653b1c1bbb              942 main/binary-arm64/Packages
+ 03d5bea97814dffc0d05a13880226156aa8ebeac226eee1718745ca56f92fef4              619 main/binary-arm64/Packages.gz
+SHA512:
+ 6641f2fd7487e7b00be3fff31d1b86cb251cfbeb2946a2c57fddd7befd9214a31b002ee68a004a45724fcb1c0660bc8b9f97dc838c269d08359a2119e7bded91              942 main/binary-amd64/Packages
+ dfb17c6c4e6da2f47c5d6e11a39b3e0d8e87b5b691c0edd614ab926af76ade39eae26874b76c4d405497bf26896ce2c83a6a72a4efc42373163807a0254b9116              619 main/binary-amd64/Packages.gz
+ 6641f2fd7487e7b00be3fff31d1b86cb251cfbeb2946a2c57fddd7befd9214a31b002ee68a004a45724fcb1c0660bc8b9f97dc838c269d08359a2119e7bded91              942 main/binary-arm64/Packages
+ dfb17c6c4e6da2f47c5d6e11a39b3e0d8e87b5b691c0edd614ab926af76ade39eae26874b76c4d405497bf26896ce2c83a6a72a4efc42373163807a0254b9116              619 main/binary-arm64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYIAB0WIQQ0O04PA7UfW2b+hURwS3bU0hC/lAUCawPfogAKCRBwS3bU0hC/
+lJ6/AQDDBajpNWbyIGPfdp7JAp3utfPa3paedVOkWnBlFhLWYQD9H21itx+sP4yJ
+kBD/3DFIWObOMMltBuaJk6frZczf3g8=
+=Qlto
+-----END PGP SIGNATURE-----

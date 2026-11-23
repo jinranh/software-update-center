@@ -1,0 +1,19 @@
+Package: software-update-center
+Architecture: all
+Version: 0.3.0
+Priority: optional
+Section: admin
+Maintainer: jinranh <92495065+jinranh@users.noreply.github.com>
+Depends: apt, sudo, python3 (>= 3.10), python3-apt, python3-gi, gir1.2-gtk-3.0, gnome-terminal, libnotify-bin
+Filename: pool/main/s/software-update-center/software-update-center_0.3.0_all.deb
+Size: 14536
+MD5sum: a2a4fd5bdf1994a7058cea9e7819f557
+SHA1: bb080ac35ae1a55eda409bba50687f06fba2f013
+SHA256: da230b12398a44485bb92fd7009b605b9b30aacca8f5c3a542fbc6840cf46a8b
+SHA512: fcc22494d60ff4923c946450cb4721a21f0d0261649493b568f07c0be97177877e24d0ce8adc7284038f462a363a33bf21959e592a2ee15782334aeee5e72926
+Homepage: https://github.com/jinranh/software-update-center
+Description: Graphical APT updater for desktop applications
+ Select installed desktop applications, preview dependency changes, and
+ retry items that failed to download. Optional reminders use a systemd
+ user timer.
+
