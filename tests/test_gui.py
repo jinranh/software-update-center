@@ -51,4 +51,30 @@ class WindowTests(unittest.TestCase):
         self.assertTrue(window.install_button.get_sensitive())
         window.destroy()
 
+    def test_catalog_shows_single_official_chatgpt_and_jammy_notice(self):
+        window = app.Window()
+        catalog = window.catalog
+        catalog.loaded({'system': ('ubuntu', '22.04', 'amd64'),
+                        'apps': {'chatgpt': dict(channel='unavailable', installed='', error='')}}, {})
+        catalog.search.set_text('chatgpt')
+        catalog.render()
+        cards = catalog.cards.get_children()
+        self.assertEqual(len(cards), 1)
+        stack = [cards[0]]
+        labels = []
+        buttons = []
+        while stack:
+            widget = stack.pop()
+            if isinstance(widget, Gtk.Label):
+                labels.append(widget.get_text())
+            if isinstance(widget, Gtk.Button):
+                buttons.append(widget.get_label())
+            if isinstance(widget, Gtk.Container):
+                stack.extend(widget.get_children())
+        self.assertTrue(any('OpenAI' in text and 'chatgpt' in text for text in labels))
+        self.assertTrue(any('Ubuntu 22.04' in text and '24.04' in text for text in labels))
+        self.assertEqual(set(buttons), {'查看官方入口', '来源与证据'})
+        window.destroy()
+
+
 if __name__=='__main__': unittest.main()

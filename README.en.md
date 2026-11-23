@@ -5,6 +5,16 @@
 
 Check, select, and upgrade APT-managed desktop apps on Ubuntu from one window. Preview dependency changes before installing. If a batch download fails, the updater tries the selected apps individually, reuses cached packages, and marks apps you can retry.
 
+## Try the official app catalog
+
+Run from a source checkout in your GNOME session:
+
+```bash
+SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
+```
+
+Preview mode uses a separate application ID and cache. You can search official products and review APT candidates without authorizing changes. Install the DEB built from this branch in an isolated Ubuntu environment to try the full privileged install workflow. The catalog handles verified APT installs and updates for Claude Desktop, Visual Studio Code and Google Chrome. On Ubuntu 22.04 the ChatGPT and Docker Desktop cards show the vendor's Ubuntu version requirements and link to official instructions. Feishu provides an official DEB download. See [the channel table](README.md#官方应用-mvp) and [catalog data](catalog.py) for evidence links and repository fingerprints.
+
 ## Quick start
 
 Tested on **Ubuntu 22.04 LTS with GNOME**.
@@ -27,7 +37,7 @@ Tested on **Ubuntu 22.04 LTS with GNOME**. Run these commands from a terminal in
 
    ```bash
    sudo apt update
-   sudo apt install git python3-apt python3-gi gir1.2-gtk-3.0 gnome-terminal libnotify-bin
+   sudo apt install git python3-apt python3-gi gir1.2-gtk-3.0 gnome-terminal libnotify-bin appstream gpg ca-certificates
    ```
 
 2. Download and install the updater.
@@ -61,7 +71,7 @@ If you previously used `setup.sh`, follow the source uninstall instructions belo
 3. Follow the terminal prompts to authorize and confirm the installation. Once it finishes, reopen the apps you updated to use their new versions.
 4. If a package times out, other available updates can still finish. The updater shows the reason and selects failed items again. Once the connection recovers, click **Update selected** to retry.
 
-The updater uses your system's existing APT sources. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. The default exclusions for Feishu, Docker Desktop, Compass, and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
+The updater uses your system's existing APT sources. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. Use the Official Apps page for catalog products. The exclusions for Compass and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
 
 ## Optional update notifications
 

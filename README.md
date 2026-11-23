@@ -5,6 +5,29 @@
 
 在一个窗口里检查、选择并升级 Ubuntu 上通过 APT 管理的桌面应用。安装前可以预览依赖变化。批量下载失败时，工具会逐项处理，复用已经下载的安装包，并在列表中标出可重试的应用。
 
+## 官方应用 MVP
+
+在 Ubuntu 22.04.5 LTS + GNOME 42（amd64）的桌面终端里，从此工作区运行只读预览：
+
+```bash
+SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
+```
+
+预览有自己的窗口标识与缓存。可以搜索、读取本机版本、核对已配置的软件源和审查安装计划。常规模式使用 `/usr/bin/python3 app.py`。要试用完整的授权与安装流程，请在隔离 Ubuntu 环境安装本分支构建的 DEB，使用由 root 持有的系统助手。启用和安装均需在窗口确认后到终端授权。
+
+| Ubuntu 22.04 amd64 | 发布者 / DEB 包名 | 官方渠道与更新方式 |
+| --- | --- | --- |
+| ChatGPT | OpenAI / `chatgpt` | 卡片显示 Linux 预览及官方入口。Ubuntu 支持版本为 24.04 和 26.04，官方 DEB 在支持平台配置签名 APT 源。[OpenAI Linux 安装指南](https://learn.chatgpt.com/docs/linux/linux-app) |
+| Claude Desktop | Anthropic / `claude-desktop` | 使用 Anthropic 签名 APT 源安装和更新。[系统要求、软件源及指纹](https://support.claude.com/en/articles/10065433-install-claude-desktop) |
+| Visual Studio Code | Microsoft / `code` | 使用 Microsoft 签名 APT 源安装和更新。[软件源说明](https://code.visualstudio.com/docs/setup/linux) · [签名指纹](https://learn.microsoft.com/en-us/linux/packages) |
+| Google Chrome | Google / `google-chrome-stable` | 使用 Google 签名 APT 源安装和更新。Chrome 安装器管理 `google-chrome.sources`。检测到旧式源或重复源会显示对应文件，需先在系统中核对并归并为唯一的官方源。[系统要求](https://support.google.com/chrome/answer/95346) · [签名指纹](https://www.google.com/linuxrepositories/) |
+| 飞书 | 北京飞书科技有限公司 / `bytedance-feishu-stable` | 从官网下载 Linux DEB。升级时可在客户端检查版本，或从官网获取新版 DEB 覆盖安装。[下载](https://www.feishu.cn/download) · [升级说明](https://www.feishu.cn/hc/zh-CN/articles/360043828013) |
+| Docker Desktop | Docker / `docker-desktop` | 当前 Ubuntu 安装指南列出 24.04 和 26.04。Desktop 使用官方 DEB 换包，安装指南里的 Docker Engine 仓库用于依赖。[Ubuntu 安装及升级](https://docs.docker.com/desktop/setup/install/linux/ubuntu/) |
+
+渠道复核日期为 2026-11-23。新增产品时，在 [catalog.py](catalog.py) 记录包名、支持平台、官方证据和签名信息。AppStream 仅补充匹配组件 ID 与软件包记录的摘要。dpkg 同名包的版本会标为本机版本，首次通过本工具替换时会在确认框说明原发布者未核实。
+
+官方 APT 操作先刷新所选厂商源并验证指纹，使用本机已取得的 APT 索引解析依赖。下载前会展示 APT 选中的 URL 和版本，授权后重新核对计划。其他源提供同名包、依赖计划变化、签名异常、版本锁定或降级会阻止操作并显示原因。系统软件源刷新失败时，「已安装更新」暂停批量更新，「官方应用」仍能独立检查。缺少依赖索引时，安装计划会显示 APT 的具体错误。
+
 ## 快速开始
 
 已验证环境为 **Ubuntu 22.04 LTS + GNOME**。
@@ -27,7 +50,7 @@
 
    ```bash
    sudo apt update
-   sudo apt install git python3-apt python3-gi gir1.2-gtk-3.0 gnome-terminal libnotify-bin
+   sudo apt install git python3-apt python3-gi gir1.2-gtk-3.0 gnome-terminal libnotify-bin appstream gpg ca-certificates
    ```
 
 2. 下载并安装。
@@ -61,7 +84,7 @@ sudo apt install ./software-update-center-apt-source.deb
 3. 在终端按提示授权并确认。安装结束后，重新打开升级过的应用即可使用新版本。
 4. 如果某个包下载超时，其他可用项仍可继续安装。失败项会显示原因并重新勾选，恢复连接后点 **更新所选** 重试。
 
-工具使用系统已经配置的 APT 源。Snap、Flatpak 和手动安装的用户目录应用走各自的更新渠道。飞书、Docker Desktop、Compass 和 WorkBuddy 的默认排除规则在 [backend.py](backend.py) 中。当前界面和终端提示主要使用简体中文。
+工具使用系统已经配置的 APT 源。Snap、Flatpak 和手动安装的用户目录应用走各自的更新渠道。目录内的软件在「官方应用」页管理。Compass 和 WorkBuddy 的默认排除规则在 [backend.py](backend.py) 中。当前界面和终端提示主要使用简体中文。
 
 ## 可选的更新提醒
 
@@ -103,3 +126,17 @@ systemctl --user daemon-reload
 ```bash
 /usr/bin/python3 -m unittest discover -s tests -v
 ```
+
+官方源和安装的集成验收在一次性 Ubuntu 22.04 amd64 容器中运行。脚本使用真实 Microsoft 仓库，另用本地签名仓库模拟同名包、下载失败与签名异常。
+
+```bash
+docker run --rm --platform linux/amd64 -v "$PWD:/src:ro" ubuntu:22.04 \
+  bash /src/tests/integration/jammy.sh
+```
+
+### MVP 实测记录
+
+- Ubuntu 22.04.5 amd64 容器从 Microsoft 签名仓库首次安装了 VS Code `1.146.0-1794340865`，再由已配置的 `vscode.list` 升级到 `1.147.0-1794903003`。两个阶段均核对了 dpkg 版本和应用安装记录。
+- 另一个软件源离线时，系统全局刷新报告该源失败，Microsoft 软件源仍可独立验证和启用。重复微软源会列出冲突文件。
+- 在签名测试源中，同名社区包、错误密钥指纹和下载 404 均被拦截。恢复下载后重试成功，测试包完成 `1.0 → 2.0`。在真实 sudo 提示中取消授权后，源和密钥文件没有变化。
+- 27 项测试通过，覆盖 GTK 搜索、勾选、依赖预览保护、逐项重试和安装后版本核对。GNOME 桌面与隔离 Xvfb 均试验了 GTK 预览。

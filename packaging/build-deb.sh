@@ -17,7 +17,7 @@ units="$stage/usr/lib/systemd/user"
 docs="$stage/usr/share/doc/software-update-center"
 
 install -d "$stage/DEBIAN" "$app" "$desktop" "$units" "$docs" "$root/dist"
-install -m 644 "$root"/{app.py,backend.py,check.conf,install.py,notify.py} "$app/"
+install -m 644 "$root"/{app.py,backend.py,catalog.py,catalog_view.py,check.conf,official_apt.py,install.py,notify.py} "$app/"
 install -m 644 "$root"/{README.md,README.en.md} "$docs/"
 install -m 644 "$root/desktop/software-update-check.timer" "$units/"
 sed 's@^Exec=.*@Exec=/usr/bin/python3 /usr/lib/software-update-center/app.py@' \
@@ -32,7 +32,7 @@ Section: admin
 Priority: optional
 Architecture: all
 Maintainer: jinranh <92495065+jinranh@users.noreply.github.com>
-Depends: apt, sudo, python3 (>= 3.10), python3-apt, python3-gi, gir1.2-gtk-3.0, gnome-terminal, libnotify-bin
+Depends: apt, sudo, gpg, ca-certificates, appstream, python3 (>= 3.10), python3-apt, python3-gi, gir1.2-gtk-3.0, gnome-terminal, libnotify-bin
 Homepage: https://github.com/jinranh/software-update-center
 Description: Graphical APT updater for desktop applications
  Select installed desktop applications, preview dependency changes, and

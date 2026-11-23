@@ -11,11 +11,15 @@ import sys
 import time
 import apt
 import apt_pkg
+import catalog
 
 ROOT = Path(__file__).resolve().parent
-CACHE = Path.home() / '.cache/software-update-center'
+PREVIEW = os.environ.get('SOFTWARE_UPDATE_CENTER_PREVIEW') == '1'
+CACHE = Path.home() / ('.cache/software-update-center-preview' if PREVIEW
+                       else '.cache/software-update-center')
 EXCLUDED = {'docker-desktop', 'workbuddy', 'mongodb-compass', 'mongodb-compass-community',
             'bytedance-feishu-stable'}
+PROTECTED = EXCLUDED | catalog.PACKAGES
 ENV = dict(os.environ, LC_ALL='C')
 
 
@@ -58,8 +62,6 @@ def desktop_apps():
                 names.setdefault(package, name)
         except (OSError, KeyError, configparser.Error):
             continue
-    names.update({'code': 'Visual Studio Code', 'chatgpt': 'ChatGPT',
-                  'google-chrome-stable': 'Google Chrome'})
     return names
 
 
@@ -80,7 +82,7 @@ def collect():
     cache = apt.Cache()
     rows = []
     for name, title in desktop_apps().items():
-        if name in cache:
+        if name not in catalog.PACKAGES and name in cache:
             record = app_record(cache[name], title)
             if record:
                 rows.append(record)
@@ -142,11 +144,23 @@ def validate_plan(output):
     return changes
 
 
+def validate_update_route(specs):
+    if any(spec.split('=', 1)[0].split(':')[0] in catalog.PACKAGES for spec in specs):
+        raise RuntimeError('请从「官方应用」页核对厂商来源并更新此软件。')
+
+
+def validate_update_plan(output):
+    changes = validate_plan(output)
+    if any(name.split(':')[0] in catalog.PACKAGES for name in changes):
+        raise RuntimeError('依赖变更涉及目录内软件，请先在「官方应用」页核对来源。')
+
+
 def preview(specs):
     validate_specs(specs)
+    validate_update_route(specs)
     output = run(['/usr/bin/apt-get', *options(), '-s', '--no-remove',
                   '--no-install-recommends', '--only-upgrade', 'install', *specs])
-    validate_plan(output)
+    validate_update_plan(output)
     return output
 
 

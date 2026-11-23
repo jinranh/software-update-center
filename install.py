@@ -3,6 +3,7 @@
 import codecs
 from dataclasses import dataclass
 import fcntl
+from pathlib import Path
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import time
 import backend
+import catalog
 
 
 @dataclass(frozen=True)
@@ -46,13 +48,14 @@ def wait_idle(busy, sleep, attempts=30):
 
 def packagekit_busy():
     from gi.repository import Gio, GLib
-    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
     try:
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
         paths = bus.call_sync('org.freedesktop.PackageKit', '/org/freedesktop/PackageKit',
             'org.freedesktop.PackageKit', 'GetTransactionList', None,
             GLib.VariantType.new('(ao)'), Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
     except GLib.Error as error:
-        if 'ServiceUnknown' in str(error):
+        if ('ServiceUnknown' in str(error) or
+                error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.NOT_FOUND)):
             return False
         raise
     if paths:
@@ -68,7 +71,7 @@ def apt_run(command):
         output = []
         # sudo and apt retain this terminal's stdin; never pass a password through code.
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              ) as process:
+                              env=backend.ENV) as process:
             decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
             for chunk in iter(lambda: os.read(process.stdout.fileno(), 4096), b''):
                 text = decoder.decode(chunk)
@@ -76,8 +79,9 @@ def apt_run(command):
                 output.append(text)
             code = process.wait()
         combined = ''.join(output)
-        with (backend.CACHE/'install.log').open('a') as log:
-            log.write(combined)
+        if os.geteuid() != 0:
+            with (backend.CACHE/'install.log').open('a') as log:
+                log.write(combined)
         if not lock_error(code, combined) or attempt == 2:
             return AptRun(code, combined)
         print('等待软件包锁释放，10 秒后重试……', flush=True)
@@ -85,6 +89,7 @@ def apt_run(command):
 
 
 def system_plan(specs):
+    backend.validate_update_route(specs)
     # Recheck the system's actual installed/hold state after its repository refresh.
     cache = backend.apt.Cache()
     for spec in specs:
@@ -96,11 +101,11 @@ def system_plan(specs):
             raise RuntimeError('软件版本已锁定，请重新检查。')
         if backend.apt_pkg.version_compare(target, package.installed.version) <= 0:
             raise RuntimeError('软件已是所选版本或更新版本，请重新检查。')
-    protected = [name+'='+cache[name].installed.version for name in sorted(backend.EXCLUDED)
+    protected = [name+'='+cache[name].installed.version for name in sorted(backend.PROTECTED)
                  if name in cache and cache[name].is_installed]
     output = backend.run(['/usr/bin/apt-get', '-s', '--no-remove', '--no-install-recommends',
                           '--only-upgrade', 'install', *specs, *protected])
-    backend.validate_plan(output)
+    backend.validate_update_plan(output)
     return protected
 
 
@@ -183,6 +188,38 @@ def upgrade(specs, runner=apt_run, planner=system_plan, installed=target_install
         return result(1, str(error) or '操作已中断。')
 
 
+def official_helper():
+    installed = Path('/usr/lib/software-update-center')
+    files = ('official_apt.py', 'catalog.py', 'check.conf', 'backend.py', 'install.py')
+    for name in files:
+        helper_file = installed / name
+        try:
+            valid = (helper_file.stat().st_uid == 0 and not helper_file.stat().st_mode & 0o022
+                     and helper_file.read_bytes() == (backend.ROOT / name).read_bytes())
+        except OSError:
+            valid = False
+        if not valid:
+            raise RuntimeError('授权安装官方应用需要同版本 DEB 提供的系统助手。源码窗口可用于只读试用。')
+    return installed / 'official_apt.py'
+
+
+def run_official(args):
+    operation, app_id, *extra = args
+    app = catalog.APPS[app_id]
+    if (operation == 'enable' and not extra or
+            operation == 'apply' and len(extra) == 1 and re.fullmatch('[0-9a-f]{64}', extra[0])):
+        print('请在此终端授权。APT 下载完成后，如出现安装提示，请核对清单并确认。\n', flush=True)
+        outcome = apt_run(['/usr/bin/sudo', '--', '/usr/bin/python3', '-E', '-s',
+                           str(official_helper()), operation, app.id, *extra])
+        if outcome.code:
+            message = outcome.output.strip().splitlines()
+            return dict(code=outcome.code, updated=[], failures={}, pending=[],
+                        message=message[-1] if message else '授权或安装未完成，可返回窗口重试。')
+        return dict(code=0, updated=[app.name] if operation == 'apply' else [], failures={}, pending=[],
+                    message='厂商源已启用。' if operation == 'enable' else '已核对安装版本。')
+    raise ValueError('未知的官方软件操作。')
+
+
 def main():
     if len(sys.argv) < 3 or not re.fullmatch('[0-9a-f]{32}',sys.argv[1]):
         return 2
@@ -192,11 +229,17 @@ def main():
     lock = (backend.CACHE/'install.lock').open('w')
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if backend.PREVIEW:
+            raise RuntimeError('当前为只读预览。')
         if os.geteuid() == 0:
             raise RuntimeError('请以普通用户打开软件更新窗口。')
-        print('请在此终端输入本机密码。安装包会先下载，随后请核对 APT 清单并输入 Y。\n', flush=True)
         (backend.CACHE/'install.log').write_text(time.strftime('%Y-%m-%d %H:%M:%S')+'\n')
-        result = upgrade(sys.argv[2:])
+        if sys.argv[2] == '--official':
+            result = run_official(sys.argv[3:])
+        else:
+            backend.validate_update_route(sys.argv[2:])
+            print('请在此终端输入本机密码。安装包会先下载，随后请核对 APT 清单并输入 Y。\n', flush=True)
+            result = upgrade(sys.argv[2:])
         for name, reason in result['failures'].items():
             print(f'{name}：{reason}。')
         if result['updated']:
