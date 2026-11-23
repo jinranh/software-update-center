@@ -55,7 +55,7 @@ class WindowTests(unittest.TestCase):
         window = app.Window()
         catalog = window.catalog
         catalog.loaded({'system': ('ubuntu', '22.04', 'amd64'),
-                        'apps': {'chatgpt': dict(channel='unavailable', installed='', error='')}}, {})
+                        'apps': {'chatgpt': dict(channel='unavailable', installed='26.1117.41037', error='')}}, {})
         catalog.search.set_text('chatgpt')
         catalog.render()
         cards = catalog.cards.get_children()
@@ -71,9 +71,9 @@ class WindowTests(unittest.TestCase):
                 buttons.append(widget.get_label())
             if isinstance(widget, Gtk.Container):
                 stack.extend(widget.get_children())
-        self.assertTrue(any('OpenAI' in text and 'chatgpt' in text for text in labels))
-        self.assertTrue(any('Ubuntu 22.04' in text and '24.04' in text for text in labels))
-        self.assertEqual(set(buttons), {'查看官方入口', '详情'})
+        self.assertIn('OpenAI', labels)
+        self.assertIn('已安装 26.1117.41037 · Ubuntu 22.04 暂无官方更新', labels)
+        self.assertEqual(set(buttons), {'详情'})
         window.destroy()
 
     def test_installed_catalog_card_has_clear_version_states_in_preview(self):
@@ -106,14 +106,67 @@ class WindowTests(unittest.TestCase):
             self.assertTrue(buttons['更新'].get_sensitive())
             view.check_result('vscode', dict(installed='2', version='2', newest='2',
                                             official=False, held=False))
-            self.assertIn('已是最新版本', visible_status())
+            self.assertIn('已是最新', visible_status())
+            self.assertNotIn('已安装 2', visible_status())
+            self.assertNotIn('安装来源待核验', visible_status())
+            self.assertNotIn('更新', {item.get_label() for item in widgets(view.cards, Gtk.Button)})
             view.check_result('vscode', dict(installed='2', version='2', newest='3',
                                             official=False, held=False))
             self.assertIn('厂商有新版 3', visible_status())
-            self.assertNotIn('已是最新版本', visible_status())
+            self.assertNotIn('已是最新', visible_status())
             view.check_result('vscode', error='网络无法连接')
             self.assertIn('检查失败', visible_status())
-            self.assertNotIn('已是最新版本', visible_status())
+            self.assertNotIn('已是最新', visible_status())
+        window.destroy()
+
+    def test_updates_page_combines_channels_and_omits_up_to_date_apps(self):
+        window = app.Window()
+        window.catalog.loaded({'system': ('ubuntu', '22.04', 'amd64'), 'apps': {
+            'vscode': dict(channel='apt', installed='1', uri='https://packages.microsoft.com/repos/code'),
+            'claude': dict(channel='apt', installed='1', uri='https://downloads.claude.ai/claude-desktop/apt/stable')
+        }}, {})
+        window.catalog.check_result('vscode', dict(installed='1', version='2', newest='2',
+                                                    official=False, held=False))
+        window.catalog.check_result('claude', dict(installed='1', version='1', newest='1',
+                                                    official=False, held=False))
+        window.render({'checked_at': 0, 'apps': [
+            dict(package='editor', name='Text Editor', installed='1', candidate='2',
+                 held=False, available=True),
+            dict(package='calculator', name='Calculator', installed='2', candidate='2',
+                 held=False, available=False),
+        ]})
+
+        def labels(widget):
+            if isinstance(widget, Gtk.Label):
+                yield widget.get_text()
+            if isinstance(widget, Gtk.Container):
+                for child in widget.get_children():
+                    yield from labels(child)
+
+        visible = set(labels(window.stack.get_child_by_name('updates')))
+        self.assertIn('Visual Studio Code', visible)
+        self.assertIn('Text Editor', visible)
+        self.assertNotIn('Claude Desktop', visible)
+        self.assertNotIn('Calculator', visible)
+        window.check_failed('测试源不可达')
+        self.assertTrue(window.check_details.get_visible())
+        self.assertIn('Visual Studio Code', set(labels(window.update_content)))
+        self.assertTrue(any(button.get_sensitive() for button, official in window.row_actions if official))
+        self.assertEqual(window.stack.child_get_property(window.catalog, 'title'), '应用')
+        self.assertEqual(window.stack.child_get_property(window.stack.get_child_by_name('updates'), 'title'), '更新')
+        window.destroy()
+
+    def test_empty_search_can_return_to_the_curated_catalog(self):
+        window = app.Window()
+        view = window.catalog
+        view.search.set_text('微信')
+        view.render()
+        message, clear = view.cards.get_children()
+        self.assertEqual(message.get_text(), '暂未收录该应用。')
+        clear.clicked()
+        view.render()
+        self.assertEqual(view.search.get_text(), '')
+        self.assertEqual(len(view.cards.get_children()), 6)
         window.destroy()
 
 

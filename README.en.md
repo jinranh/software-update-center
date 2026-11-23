@@ -13,7 +13,7 @@ Run from a source checkout in your GNOME session:
 SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
 ```
 
-Preview mode uses a separate application ID and cache. You can search official products and review APT candidates without authorizing changes. Install the DEB built from this branch in an isolated Ubuntu environment to try the full privileged install workflow. The catalog handles verified APT installs and updates for Claude Desktop, Visual Studio Code and Google Chrome. On Ubuntu 22.04 the ChatGPT and Docker Desktop cards show the vendor's Ubuntu version requirements and link to official instructions. Feishu provides an official DEB download. See [the channel table](README.md#官方应用-mvp) and [catalog data](catalog.py) for evidence links and repository fingerprints.
+Preview mode uses a separate application ID and cache. Search the curated catalog in Apps. Updates shows actionable updates from verified vendor repositories and the system APT sources in one place. You can review candidates in preview mode. Install the DEB built from this branch in an isolated Ubuntu environment to try the full privileged install workflow. The catalog handles verified APT installs and updates for Claude Desktop, Visual Studio Code and Google Chrome. On Ubuntu 22.04 the ChatGPT and Docker Desktop cards show the vendor's Ubuntu version requirements and link to official instructions. Feishu provides an official DEB download. See [the channel table](README.md#官方应用-mvp) and [catalog data](catalog.py) for evidence links and repository fingerprints.
 
 ## Quick start
 

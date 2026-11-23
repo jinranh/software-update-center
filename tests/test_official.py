@@ -10,6 +10,9 @@ class CatalogTests(unittest.TestCase):
     def test_aliases_and_package_names_are_one_official_product(self):
         for query, app, publisher in (
             ('chat gpt', 'chatgpt', 'OpenAI'),
+            ('ＣｈａｔＧＰＴ', 'chatgpt', 'OpenAI'),
+            ('ChatGPT OpenAI', 'chatgpt', 'OpenAI'),
+            ('微软 VS Code', 'vscode', 'Microsoft'),
             ('Claude', 'claude', 'Anthropic'),
             ('code', 'vscode', 'Microsoft'),
             ('谷歌浏览器', 'chrome', 'Google'),

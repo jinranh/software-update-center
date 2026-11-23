@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import platform
 import re
+import unicodedata
 from urllib.parse import urlsplit
 
 
@@ -136,14 +137,21 @@ APPS = {app.id: app for app in (
 
 
 def search(query):
-    normalized = re.sub(r'[^\w]', '', query.casefold())
+    query = unicodedata.normalize('NFKC', query).strip().casefold()
+    if not query:
+        return list(APPS.values())
+    normalized = re.sub(r'[^\w]', '', query)
+    if not normalized:
+        return []
+    terms = [re.sub(r'[^\w]', '', part) for part in query.split()]
+    terms = [term for term in terms if term]
     fields = {app.id: [re.sub(r'[^\w]', '', value.casefold())
                        for value in (app.name, app.package, app.publisher, *app.aliases)]
               for app in APPS.values()}
     exact = [app for app in APPS.values() if normalized in fields[app.id]]
     return exact or [app for app in APPS.values()
-                     if any(normalized in field for field in fields[app.id])]
-
+                     if any(normalized in field for field in fields[app.id])
+                     or all(any(term in field for field in fields[app.id]) for term in terms)]
 
 
 PACKAGES = frozenset(app.package for app in APPS.values())

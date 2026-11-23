@@ -24,32 +24,46 @@ CSS = b"""
 .catalog-sidebar button:hover { background: #e0e7ef; }
 .catalog-sidebar button:checked { background: #d4e2ee; }
 .catalog-view label, .catalog-updates label { color: #202d3b; }
+.catalog-updates label.catalog-meta { color: #536477; }
+.catalog-updates label.catalog-error { color: #9c3238; }
+.catalog-updates label.update-empty { font-size: 19px; color: #536477; }
+.catalog-updates check { background: #f7fafe; border: 1px solid #8195a7; border-radius: 4px; }
+.catalog-updates check:checked { background: #16649b; border-color: #16649b; color: #fff; }
 .catalog-view label.catalog-meta { color: #536477; }
 .catalog-heading { font-size: 27px; font-weight: bold; }
 .catalog-search { background: #e8edf3; color: #243346; border: 1px solid #e8edf3;
                   border-radius: 10px; box-shadow: none; padding: 8px 11px; }
 .catalog-search:focus { border-color: #477aab; }
 .catalog-search placeholder { color: #5e6d7c; }
-.catalog-card { padding: 14px 17px; background: #fff; border: 1px solid #dde5ec;
+.catalog-card { padding: 10px 14px; background: #fff; border: 1px solid #dde5ec;
                 border-radius: 14px; }
-.catalog-icon { padding: 11px; border-radius: 11px; color: #216670; background: #e1f0f1; }
+.catalog-icon { padding: 8px; border-radius: 11px; color: #216670; background: #e1f0f1; }
 .catalog-product { font-size: 17px; font-weight: bold; }
-.catalog-status { font-weight: bold; }
 .catalog-view label.catalog-latest { color: #285f55; }
 .catalog-view label.catalog-update { color: #0e5795; }
 .catalog-view label.catalog-error { color: #9c3238; }
-.catalog-view button { border-radius: 14px; box-shadow: none; text-shadow: none;
+.catalog-view button,
+.catalog-updates button { border-radius: 14px; box-shadow: none; text-shadow: none;
                        min-height: 25px; min-width: 64px; padding: 2px 10px; }
-.catalog-view button:not(.catalog-action):not(.link) { background: #edf2f7; color: #344e66;
+.catalog-view button:not(.catalog-action):not(.link),
+.catalog-updates button:not(.catalog-action):not(.link) { background: #edf2f7; color: #344e66;
                                                      border: 1px solid #dfe7ef; }
-.catalog-view button:not(.catalog-action):not(.link):hover { background: #e2ebf3; }
-.catalog-view button:not(.catalog-action):not(.link):disabled { color: #697d92; }
-.catalog-view button.link { color: #215b89; }
-.catalog-view button.catalog-action { background: #16649b; color: #fff; border: 1px solid #16649b; }
-.catalog-view button.catalog-action:hover { background: #105786; }
-.catalog-view button.catalog-action label { color: #fff; }
-.catalog-view button.catalog-action:disabled label { color: #697d92; }
-.catalog-view button.catalog-action:disabled { background: #e7eef4; color: #697d92;
+.catalog-view button:not(.catalog-action):not(.link):hover,
+.catalog-updates button:not(.catalog-action):not(.link):hover { background: #e2ebf3; }
+.catalog-view button:not(.catalog-action):not(.link):disabled,
+.catalog-updates button:not(.catalog-action):not(.link):disabled { color: #697d92; }
+.catalog-view button.link,
+.catalog-updates button.link { color: #215b89; }
+.catalog-view button.catalog-action,
+.catalog-updates button.catalog-action { background: #16649b; color: #fff; border: 1px solid #16649b; }
+.catalog-view button.catalog-action:hover,
+.catalog-updates button.catalog-action:hover { background: #105786; }
+.catalog-view button.catalog-action label,
+.catalog-updates button.catalog-action label { color: #fff; }
+.catalog-view button.catalog-action:disabled label,
+.catalog-updates button.catalog-action:disabled label { color: #697d92; }
+.catalog-view button.catalog-action:disabled,
+.catalog-updates button.catalog-action:disabled { background: #e7eef4; color: #697d92;
                                               border-color: #e7eef4; }
 """
 
@@ -106,16 +120,10 @@ class CatalogView(Gtk.Box):
         self.active = None
         self.loading = False
         self.message = ''
-        self.pack_start(label('官方应用', 'catalog-heading'), False, False, 0)
-        self.search = styled(Gtk.SearchEntry(placeholder_text='搜索应用'), 'catalog-search')
+        self.pack_start(label('应用', 'catalog-heading'), False, False, 0)
+        self.search = styled(Gtk.SearchEntry(placeholder_text=f'搜索已收录的 {len(catalog.APPS)} 款应用'), 'catalog-search')
         self.search.connect('search-changed', self.render)
         self.pack_start(self.search, False, False, 0)
-        self.note = label()
-        toolbar = Gtk.Box(spacing=8)
-        toolbar.pack_start(self.note, True, True, 0)
-        self.reload_button = action('检查更新', lambda *_: self.refresh())
-        toolbar.pack_end(self.reload_button, False, False, 0)
-        self.pack_start(toolbar, False, False, 0)
         self.notice = Gtk.Box(spacing=9)
         self.spinner = Gtk.Spinner()
         self.notice.pack_start(self.spinner, False, False, 0)
@@ -130,7 +138,7 @@ class CatalogView(Gtk.Box):
         self.render()
 
     def refresh(self):
-        if self.loading or self.active or self.checking or self.window.installing:
+        if self.loading or self.active or self.checking or self.window.installing or self.window.preparing:
             return
         self.loading = True
         self.render()
@@ -191,18 +199,6 @@ class CatalogView(Gtk.Box):
     def render(self, *_):
         for child in self.cards.get_children():
             child.destroy()
-        if self.state:
-            distro, version, arch = self.state['system']
-            system = f'{distro.capitalize()} {version} · {arch}'
-            self.note.set_text(system + (' · 只读预览' if backend.PREVIEW else ''))
-            if self.checking:
-                self.reload_button.set_label('正在检查…')
-            else:
-                self.reload_button.set_label('检查更新')
-        else:
-            self.note.set_text('正在读取本机软件包和来源……' if self.loading or not self.message else
-                               '无法读取本机状态。')
-        self.reload_button.set_sensitive(not (self.loading or self.active or self.checking or self.window.installing))
         self.progress.set_text(self.message)
         if self.active:
             self.spinner.show()
@@ -216,51 +212,50 @@ class CatalogView(Gtk.Box):
             self.notice.show()
         apps = catalog.search(self.search.get_text())
         if not apps:
-            self.cards.pack_start(label('目录里没有匹配的官方应用。'), False, False, 10)
+            self.cards.pack_start(label('暂未收录该应用。', 'catalog-meta'), False, False, 10)
+            clear = action('查看全部应用', lambda *_: self.search.set_text(''))
+            clear.set_halign(Gtk.Align.START)
+            self.cards.pack_start(clear, False, False, 0)
         for app in apps:
             self.cards.pack_start(self.card(app), False, False, 0)
         self.cards.show_all()
+        self.window.refresh_updates()
 
     def card(self, app):
         row = self.state.get('apps', {}).get(app.id, {})
         card = styled(Gtk.Box(spacing=13), 'catalog-card')
         icon = Gtk.Image.new_from_icon_name(app.icon, Gtk.IconSize.DIALOG)
-        icon.set_valign(Gtk.Align.START)
+        icon.set_pixel_size(26)
+        icon.set_valign(Gtk.Align.CENTER)
         card.pack_start(styled(icon, 'catalog-icon'), False, False, 0)
-        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
         card.pack_start(body, True, True, 0)
-        for text, style in (
-                (app.name, 'catalog-product'),
-                (f'{app.publisher}  ·  {app.package}', 'catalog-meta'),
-                (self.summaries.get(app.id) or app.summary, None)):
-            body.pack_start(label(text, style), False, False, 0)
+        body.pack_start(label(app.name, 'catalog-product'), False, False, 0)
+        body.pack_start(label(app.publisher, 'catalog-meta'), False, False, 0)
         channel = row.get('channel')
         installed = row.get('installed', '')
         if channel == 'unavailable':
-            distro, version, arch = self.state['system']
-            body.pack_start(label(f'{distro.capitalize()} {version} / {arch} 不在支持范围。'
-                                  f'厂商支持 {app.support}', 'catalog-meta'), False, False, 0)
+            distro, version, _ = self.state['system']
+            system = f'{distro.capitalize()} {version}'
+            status = (f'已安装 {installed} · {system} 暂无官方更新' if installed
+                      else f'{system} 暂无官方版本')
+            body.pack_start(label(status, 'catalog-meta'), False, False, 0)
         elif channel == 'deb':
-            if installed:
-                body.pack_start(label(f'已安装 {installed} · 请到官网核对新版', 'catalog-status'), False, False, 0)
-            body.pack_start(label(app.update, 'catalog-meta'), False, False, 0)
+            status = '已安装 · 更新由厂商提供' if installed else '通过官网安装'
+            body.pack_start(label(status, 'catalog-meta'), False, False, 0)
         elif channel == 'apt':
             status, style = self.version_status(app, row)
-            if status:
-                body.pack_start(label(status, style), False, False, 0)
-            if installed:
-                provenance = '' if row.get('official') else ' · 安装来源待核验'
-                body.pack_start(label(f'已安装 {installed}{provenance}', 'catalog-meta'), False, False, 0)
+            body.pack_start(label(status, style), False, False, 0)
 
-        bar = Gtk.Box(spacing=5, valign=Gtk.Align.START, orientation=Gtk.Orientation.VERTICAL)
+        bar = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
         card.pack_end(bar, False, False, 0)
         bar.pack_end(action('详情', lambda *_: self.details(app, row)), False, False, 0)
-        busy = bool(self.loading or self.active or self.checking or self.window.installing)
+        busy = bool(self.loading or self.active or self.checking or self.window.installing or self.window.preparing)
         if channel == 'apt' and not row.get('error'):
             if row.get('check_error'):
                 button = action('重试', lambda *_: self.check_versions([app.id]), True)
             elif not row.get('uri'):
-                button = action('安装', lambda *_: self.enable(app), True)
+                button = action('设置更新' if installed else '安装', lambda *_: self.enable(app), True)
             elif not installed:
                 button = action('安装', lambda *_: self.preview(app), True)
             elif self.update_available(row):
@@ -272,11 +267,10 @@ class CatalogView(Gtk.Box):
                     button.set_tooltip_text('只读预览可查看更新计划')
                 button.set_sensitive(not busy)
                 bar.pack_start(button, False, False, 0)
-            if row.get('official'):
+            if row.get('official') and button is None:
                 bar.pack_start(action('打开', lambda *_: self.open_app(app)), False, False, 0)
-        elif channel in ('deb', 'unavailable'):
-            button = Gtk.LinkButton.new_with_label(app.website, '官方下载' if channel == 'deb' else '查看官方入口')
-            bar.pack_start(button, False, False, 0)
+        elif channel == 'deb' and not installed:
+            bar.pack_start(Gtk.LinkButton.new_with_label(app.website, '官方下载'), False, False, 0)
         return card
 
     def version_status(self, app, row):
@@ -284,8 +278,10 @@ class CatalogView(Gtk.Box):
         error = row.get('error', '')
         if '重复' in error:
             return '有重复软件源，暂时无法更新', 'catalog-error'
-        if error or row.get('held'):
-            return error.splitlines()[0] if error else '版本已锁定', 'catalog-error'
+        if row.get('held') or '已锁定' in error:
+            return '版本已锁定', 'catalog-meta'
+        if error:
+            return '无法检查更新', 'catalog-error'
         if row.get('check_error'):
             return '检查失败，请重试', 'catalog-error'
         if not installed:
@@ -293,22 +289,22 @@ class CatalogView(Gtk.Box):
         if app.id in self.checking:
             return '正在检查更新…', 'catalog-meta'
         if not row.get('uri'):
-            return '安装官方版后可检查更新', 'catalog-meta'
+            return '更新来源待设置', 'catalog-meta'
         if not row.get('checked'):
             return '待检查', 'catalog-meta'
         target, newest = row['version'], row['newest']
         if self.update_available(row):
             return f'有更新 · {target}', 'catalog-update'
         if backend.apt_pkg.version_compare(newest, installed) > 0:
-            return f'厂商有新版 {newest} · 本机 APT 当前选中 {target}', 'catalog-meta'
-        return '已是最新版本', 'catalog-latest'
+            return f'厂商有新版 {newest} · 当前不可更新', 'catalog-meta'
+        return '已是最新', 'catalog-latest'
 
     def update_available(self, row):
         return (bool(row.get('checked') and row.get('installed')) and not row.get('held')
                 and backend.apt_pkg.version_compare(row['version'], row['installed']) > 0)
 
     def details(self, app, row):
-        dialog = Gtk.Dialog(title=f'{app.name} · 来源与证据', transient_for=self.window, modal=True)
+        dialog = Gtk.Dialog(title=app.name, transient_for=self.window, modal=True)
         dialog.set_default_size(630, -1)
         dialog.add_button('关闭', Gtk.ResponseType.CLOSE)
         if (row.get('checked') and not row.get('official') and row.get('installed') == row.get('version')
@@ -317,8 +313,15 @@ class CatalogView(Gtk.Box):
         area = dialog.get_content_area()
         area.set_spacing(9)
         area.set_border_width(16)
-        description = [f'发布者  {app.publisher}', f'DEB 软件包  {app.package}',
+        description = [self.summaries.get(app.id) or app.summary,
+                       f'发布者  {app.publisher}', f'DEB 软件包  {app.package}',
                        f'系统要求  {app.support}', f'更新方式  {app.update}']
+        if row.get('installed'):
+            description.append(f'本机版本  {row["installed"]}')
+            if not row.get('official'):
+                description.append('本机安装来源未核验。')
+        if row.get('checked'):
+            description.append(f'厂商最新版本  {row["newest"]}')
         if app.repo:
             description.extend((f'仓库  {row.get("uri") or app.repo.uri}',
                                 f'套件 / 组件  {app.repo.suite} / {app.repo.component}',
@@ -331,6 +334,8 @@ class CatalogView(Gtk.Box):
         summary = label('\n'.join(description))
         summary.set_selectable(True)
         area.pack_start(summary, False, False, 0)
+        if all(uri != app.website for _, uri in app.evidence):
+            area.pack_start(Gtk.LinkButton.new_with_label(app.website, '厂商官网'), False, False, 0)
         for text, uri in app.evidence:
             area.pack_start(Gtk.LinkButton.new_with_label(uri, text), False, False, 0)
         dialog.show_all()
@@ -340,7 +345,7 @@ class CatalogView(Gtk.Box):
             self.preview(app, reinstall=True)
 
     def enable(self, app):
-        if self.loading or self.active or self.checking or self.window.installing:
+        if self.loading or self.active or self.checking or self.window.installing or self.window.preparing:
             return
         message = (f'{app.publisher} · {app.package}\n\n{app.repo.uri}\n'
                    f'{app.repo.suite} / {app.repo.component}\n\n'
@@ -358,7 +363,7 @@ class CatalogView(Gtk.Box):
         self.preview(app)
 
     def preview(self, app, reinstall=False):
-        if self.loading or self.active or self.checking or self.window.installing:
+        if self.loading or self.active or self.checking or self.window.installing or self.window.preparing:
             return
         self.active = app.id
         self.message = f'正在单独刷新 {app.publisher} 软件源并核对 APT 候选包……'
