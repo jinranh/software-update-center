@@ -248,7 +248,9 @@ def changes_from_simulation(output):
     for line in lines:
         if not line.startswith('Inst '):
             continue
-        match = re.match(r'^Inst (\S+)(?: \[([^\]]+)\])? \((\S+) .*\[([^\]]+)\]\)$', line)
+        # APT can annotate intermediate dependency ordering after the package details.
+        match = re.fullmatch(r'Inst (\S+)(?: \[([^\]]+)\])? \((\S+) .*\[([a-z0-9-]+)\]\)'
+                             r'(?: \[[^\]]*\])*', line)
         if not match:
             raise RuntimeError(f'无法解析 APT 依赖计划：{line}')
         name, installed, version, arch = match.groups()

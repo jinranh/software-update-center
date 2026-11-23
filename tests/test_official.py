@@ -56,6 +56,15 @@ class SourceTests(unittest.TestCase):
 
 
 class TransactionTests(unittest.TestCase):
+    def test_preview_reads_apt_temporary_dependency_annotations(self):
+        output = ('Inst humanity-icon-theme (0.6.16 Ubuntu:22.04/jammy [all]) []\n'
+                  'Inst code [1] (2 stable [amd64]) [code:amd64 ]\n'
+                  'Conf humanity-icon-theme (0.6.16 Ubuntu:22.04/jammy [all])\n'
+                  'Conf code (2 stable [amd64])\n')
+        self.assertEqual(official_apt.changes_from_simulation(output), [
+            ('humanity-icon-theme', None, '0.6.16', 'all'), ('code', '1', '2', 'amd64'),
+        ])
+
     def test_dpkg_hook_rejects_change_after_the_review(self):
         import io
         import json

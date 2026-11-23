@@ -39,8 +39,9 @@ def options():
 
 def refresh():
     (CACHE / 'lists/partial').mkdir(parents=True, exist_ok=True)
+    # Jammy APT can stall on a failed retry while a repository shares the host queue.
     run(['/usr/bin/apt-get', *options(), '-o', 'APT::Update::Error-Mode=any',
-         '-o', 'Acquire::Retries=1', '-o', 'Acquire::https::Timeout=20',
+         '-o', 'Acquire::Retries=0', '-o', 'Acquire::https::Timeout=20',
          '-o', 'Acquire::http::Timeout=20', 'update'], timeout=120)
 
 

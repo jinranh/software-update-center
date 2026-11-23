@@ -28,7 +28,8 @@ def refresh_lists(lists):
     lists.mkdir(mode=0o755)
     try:
         backend.run([*vendor.APT_BASE, *vendor.apt_options(settings(lists)),
-                     '-o', 'APT::Update::Error-Mode=any', 'update'], timeout=145)
+                     '-o', 'Acquire::Retries=0', '-o', 'APT::Update::Error-Mode=any',
+                     'update'], timeout=145)
         return ''
     except RuntimeError as error:
         if not any(path.is_file() and INDEX.search(path.name) for path in lists.iterdir()):
