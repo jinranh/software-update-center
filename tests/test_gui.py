@@ -8,6 +8,20 @@ from gi.repository import Gtk
 import app
 
 class WindowTests(unittest.TestCase):
+    def test_notification_opens_updates_on_first_activation(self):
+        from unittest.mock import patch
+
+        from gi.repository import Gio
+        application = app.Application()
+        application.set_flags(application.get_flags() | Gio.ApplicationFlags.NON_UNIQUE)
+        application.register()
+        self.assertIsNone(application.window)
+        with patch.object(app.Window, 'check'):
+            command = type('Command', (), {'get_arguments': lambda self: ['app.py', '--updates']})()
+            self.assertEqual(application.do_command_line(command), 0)
+            self.assertEqual(application.window.stack.get_visible_child_name(), 'updates')
+            application.window.destroy()
+
     def test_only_available_rows_can_be_selected(self):
         window=app.Window()
         window.render({'checked_at':0,'apps':[

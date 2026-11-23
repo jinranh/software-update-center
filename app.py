@@ -442,6 +442,7 @@ class Application(Gtk.Application):
     def __init__(self):
         app_id = 'local.software.UpdateCenter.Preview' if backend.PREVIEW else 'local.software.UpdateCenter'
         super().__init__(application_id=app_id, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+        self.window = None
 
     def do_command_line(self, command_line):
         args = command_line.get_arguments()[1:]
@@ -453,7 +454,6 @@ class Application(Gtk.Application):
             self.window.stack.set_visible_child_name('updates')
         return 0
 
-        self.window = None
     def do_activate(self):
         if self.window is None:
             self.window = Window(self)
