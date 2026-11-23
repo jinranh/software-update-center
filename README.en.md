@@ -60,18 +60,18 @@ Install the separate [APT source package](https://github.com/jinranh/software-up
 sudo apt install ./software-update-center-apt-source.deb
 ```
 
-This opts in to the project's signed APT source. If you installed the updater as a DEB, its new versions will appear in the app after **Check for updates**. Select the upgrade and confirm it, then close and reopen the updater.
+This opts in to the project's signed APT source. If you installed the updater as a DEB, its new versions will appear in the app after **Check for updates**. Select the upgrade on the Updates page and confirm it, then close and reopen the updater.
 
 If you previously used `setup.sh`, follow the source uninstall instructions below to remove the old user launcher and timer before installing the DEB. To remove the APT source, run `sudo apt purge software-update-center-apt-source`.
 
 ## Use the updater
 
 1. Click **Check for updates** (检查更新) to see installed and available versions.
-2. Select the apps you want, click **Update selected** (更新所选), review the dependency changes, and choose **Continue installation** (继续安装).
+2. On the Updates page, click **Update** (更新) beside an app and review its dependencies. When **Select a batch** (批量选择) is available, you can select multiple eligible updates.
 3. Follow the terminal prompts to authorize and confirm the installation. Once it finishes, reopen the apps you updated to use their new versions.
 4. If a package times out, other available updates can still finish. The updater shows the reason and selects failed items again. Once the connection recovers, click **Update selected** to retry.
 
-The updater uses your system's existing APT sources. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. Use the Official Apps page for catalog products. The exclusions for Compass and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
+The updater uses your system's existing APT sources. Snap, Flatpak, and manually installed apps in your home directory use their own update channels. The Updates page lists available updates from verified vendor repositories and system APT sources together. The exclusions for Compass and WorkBuddy are listed in [backend.py](backend.py). The app interface and terminal prompts are primarily in Simplified Chinese.
 
 ## Optional update notifications
 
@@ -79,7 +79,7 @@ The updater uses your system's existing APT sources. Snap, Flatpak, and manually
 systemctl --user enable --now software-update-check.timer
 ```
 
-The timer checks a few minutes after you sign in and around 10:00 each day in your local time zone. Click the notification to open the updater and choose which updates to install. To turn off reminders, run `systemctl --user disable --now software-update-check.timer`.
+The timer checks a few minutes after you sign in and around 10:00 each day in your local time zone. Reminders cover system APT updates and configured signed vendor repositories. Click a notification to open the Updates page and choose what to install. To turn off reminders, run `systemctl --user disable --now software-update-check.timer`.
 
 ## Upgrade or uninstall the updater
 

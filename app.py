@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import subprocess
+import sys
 import threading
 import uuid
 import gi
@@ -440,7 +441,18 @@ class Window(Gtk.ApplicationWindow):
 class Application(Gtk.Application):
     def __init__(self):
         app_id = 'local.software.UpdateCenter.Preview' if backend.PREVIEW else 'local.software.UpdateCenter'
-        super().__init__(application_id=app_id, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        super().__init__(application_id=app_id, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+
+    def do_command_line(self, command_line):
+        args = command_line.get_arguments()[1:]
+        if args not in ([], ['--updates']):
+            print('Usage: app.py [--updates]', file=sys.stderr)
+            return 2
+        self.activate()
+        if args == ['--updates']:
+            self.window.stack.set_visible_child_name('updates')
+        return 0
+
         self.window = None
     def do_activate(self):
         if self.window is None:
@@ -452,4 +464,4 @@ class Application(Gtk.Application):
         self.window.present()
 
 if __name__ == '__main__':
-    Application().run(None)
+    sys.exit(Application().run(sys.argv))

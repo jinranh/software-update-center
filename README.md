@@ -75,7 +75,7 @@ SOFTWARE_UPDATE_CENTER_PREVIEW=1 /usr/bin/python3 app.py
 sudo apt install ./software-update-center-apt-source.deb
 ```
 
-此包会配置项目的签名 APT 源。在「软件更新」里点击 **检查更新** 后，已通过 DEB 安装的「软件更新」自身有新版时，也会出现在列表中。勾选确认即可升级。升级后关闭并重新打开窗口。
+此包会配置项目的签名 APT 源。在「更新」页点击 **检查更新** 后，已通过 DEB 安装的「软件更新」自身有新版时，也会出现在列表中。点击 **更新** 并确认即可升级。升级后关闭并重新打开窗口。
 
 如果之前用 `setup.sh` 安装过，请先按下文的源码版卸载步骤移除旧的用户级启动入口和定时任务，再安装 DEB。停用此软件源可运行 `sudo apt purge software-update-center-apt-source`。
 
@@ -94,7 +94,7 @@ sudo apt install ./software-update-center-apt-source.deb
 systemctl --user enable --now software-update-check.timer
 ```
 
-启用后在登录后的几分钟内、以及本地时间每天 10:00 左右检查一次。有更新时点击通知可打开窗口，仍由你选择并确认安装。关闭提醒可以运行 `systemctl --user disable --now software-update-check.timer`。
+启用后在登录后的几分钟内、以及本地时间每天 10:00 左右检查一次。提醒涵盖系统 APT 更新和已配置的厂商签名源。点击通知可直接打开「更新」页，由你选择并确认安装。关闭提醒可以运行 `systemctl --user disable --now software-update-check.timer`。
 
 ## 更新或卸载工具
 

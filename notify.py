@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """Daily check and a clickable notification; never installs software."""
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import subprocess
@@ -7,6 +8,7 @@ import sys
 import gi
 from gi.repository import Gio, GLib
 import backend
+import catalog
 
 ROOT = Path(__file__).resolve().parent
 
@@ -24,7 +26,7 @@ def notify(state):
             return
         if signal == 'ActionInvoked':
             if values[1] in ('default', 'open'):
-                subprocess.Popen(['/usr/bin/python3',str(ROOT/'app.py')],
+                subprocess.Popen(['/usr/bin/python3', str(ROOT / 'app.py'), '--updates'],
                                  stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             loop.quit()
         elif signal == 'NotificationClosed':
@@ -56,9 +58,39 @@ def notify(state):
     bus.signal_unsubscribe(subscription)
 
 
+def read_check(entry_point, *args, timeout):
+    try:
+        return json.loads(backend.run(['/usr/bin/python3', str(ROOT / entry_point), *args],
+                                      timeout=timeout))
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(error, file=sys.stderr)
+        return {}
+
+
+def vendor_update(app_id):
+    checked = read_check('official_apt.py', 'check', app_id, timeout=190)
+    if (checked.get('installed') and not checked['held'] and
+            backend.apt_pkg.version_compare(checked['version'], checked['installed']) > 0):
+        return dict(name=catalog.APPS[app_id].name, available=True)
+    return None
+
+
+def collect_updates():
+    # System APT and vendor probes run in separate subprocesses with separate indexes.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        system = pool.submit(read_check, 'backend.py', '--check', timeout=330)
+        state = read_check('official_apt.py', 'status', timeout=30)
+        eligible = [key for key, row in state.get('apps', {}).items()
+                    if row['channel'] == 'apt' and row.get('installed') and row.get('uri')
+                    and not row.get('error')]
+        vendors = [pool.submit(vendor_update, key) for key in eligible]
+        available = [row for row in system.result().get('apps', ()) if row['available']]
+        available.extend(row for row in (future.result() for future in vendors) if row)
+        return available
+
+
 def main():
-    state=json.loads(backend.run(['/usr/bin/python3',str(ROOT/'backend.py'),'--check'],timeout=330))
-    notify(state)
+    notify({'apps': collect_updates()})
 
 if __name__=='__main__':
     try:

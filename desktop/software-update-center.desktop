@@ -2,7 +2,8 @@
 Type=Application
 Name=软件更新
 Name[en]=Software Update Center
-Comment=检查并按需升级 APT 桌面应用
+Comment=查找并安装常用应用，集中管理更新
+Comment[en]=Find and install desktop apps and manage their updates
 Exec=/bin/sh -c "exec /usr/bin/python3 ~/.local/share/software-update-center/app.py"
 Icon=system-software-update
 Terminal=false

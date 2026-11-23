@@ -34,10 +34,10 @@ Architecture: all
 Maintainer: jinranh <92495065+jinranh@users.noreply.github.com>
 Depends: apt, sudo, gpg, ca-certificates, appstream, python3 (>= 3.10), python3-apt, python3-gi, gir1.2-gtk-3.0, gnome-terminal, libnotify-bin
 Homepage: https://github.com/jinranh/software-update-center
-Description: Graphical APT updater for desktop applications
- Select installed desktop applications, preview dependency changes, and
- retry items that failed to download. Optional reminders use a systemd
- user timer.
+Description: Find, install and update desktop applications
+ Browse a curated catalog, verify vendor APT sources, and manage available
+ updates in one place. Preview dependencies before applying changes.
+ Optional desktop reminders use a systemd user timer.
 CONTROL
 
 dpkg-deb --root-owner-group --build "$stage" "$work/software-update-center.deb"
