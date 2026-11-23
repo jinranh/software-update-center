@@ -36,3 +36,22 @@ Description: Find, install and update desktop applications
  updates in one place. Preview dependencies before applying changes.
  Optional desktop reminders use a systemd user timer.
 
+Package: software-update-center
+Architecture: all
+Version: 0.4.1
+Priority: optional
+Section: admin
+Maintainer: jinranh <92495065+jinranh@users.noreply.github.com>
+Depends: apt, sudo, gpg, ca-certificates, appstream, python3 (>= 3.10), python3-apt, python3-gi, gir1.2-gtk-3.0, gnome-terminal, libnotify-bin
+Filename: pool/main/s/software-update-center/software-update-center_0.4.1_all.deb
+Size: 38088
+MD5sum: 78baa4e9994bbf9ddd6886b295b6af3e
+SHA1: 88a151ba72b38037e82726d45b1411ed962d734c
+SHA256: 7f25052ebfd0b8ff3ab782795becc4f9d2b3ae7ffa3e822c79431bca9764fa74
+SHA512: 94baf342b4993fd3044c2bb6cbda31ccde654aac730e954d02cb3d20a3385c72755826822b099c6a21f4eeb28258f21f359ef08a1f3a52bce3cc116f283cf0ae
+Homepage: https://github.com/jinranh/software-update-center
+Description: Find, install and update desktop applications
+ Browse a curated catalog, verify vendor APT sources, and manage available
+ updates in one place. Preview dependencies before applying changes.
+ Optional desktop reminders use a systemd user timer.
+
