@@ -7,6 +7,20 @@
 
 ## 快速开始
 
+已验证环境为 **Ubuntu 22.04 LTS + GNOME**。
+
+1. 从 [最新发布版本](https://github.com/jinranh/software-update-center/releases/latest) 的 **Assets** 下载 [software-update-center.deb](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center.deb)。
+2. 在下载目录打开终端，运行：
+
+   ```bash
+   sudo apt install ./software-update-center.deb
+   ```
+
+   APT 会从系统软件源补齐缺少的依赖，包括 Python 和 GTK。下载缺少的依赖需要联网。
+3. 安装完成后，在应用菜单搜索 **软件更新**。
+
+## 从源码运行或安装
+
 已验证环境为 **Ubuntu 22.04 LTS + GNOME**。请在当前 GNOME 桌面会话的终端里执行，升级软件时需要本机管理员权限。
 
 1. 安装依赖和 Git。
@@ -46,6 +60,10 @@ systemctl --user enable --now software-update-check.timer
 启用后在登录后的几分钟内、以及本地时间每天 10:00 左右检查一次。有更新时点击通知可打开窗口，仍由你选择并确认安装。关闭提醒可以运行 `systemctl --user disable --now software-update-check.timer`。
 
 ## 更新或卸载工具
+
+通过 DEB 安装时，下载新版的 `software-update-center.deb`，在下载目录重新运行 `sudo apt install ./software-update-center.deb`。要卸载 DEB 版，请先关闭窗口，有启用更新提醒时先关闭提醒，然后运行 `sudo apt remove software-update-center`。
+
+以下步骤适用于通过 `setup.sh` 安装的版本。
 
 通过 Git 安装时，可以在源码目录运行 `git pull --ff-only` 再运行 `./setup.sh`。通过 ZIP 安装时，下载并解压新版后重新运行 `bash setup.sh`。安装完成后，关闭并重开窗口以载入新版。
 

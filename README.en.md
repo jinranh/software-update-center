@@ -7,6 +7,20 @@ Check, select, and upgrade APT-managed desktop apps on Ubuntu from one window. P
 
 ## Quick start
 
+Tested on **Ubuntu 22.04 LTS with GNOME**.
+
+1. Download [software-update-center.deb](https://github.com/jinranh/software-update-center/releases/latest/download/software-update-center.deb) from the **Assets** section of the [latest release](https://github.com/jinranh/software-update-center/releases/latest).
+2. Open a terminal in the download directory and run:
+
+   ```bash
+   sudo apt install ./software-update-center.deb
+   ```
+
+   APT installs missing dependencies, including Python and GTK, from your configured system repositories. An internet connection is required to download missing dependencies.
+3. Open **Software Update Center** (软件更新) from the applications menu.
+
+## Run or install from source
+
 Tested on **Ubuntu 22.04 LTS with GNOME**. Run these commands from a terminal in your GNOME session. You'll need local administrator privileges to install updates.
 
 1. Install the dependencies and Git.
@@ -46,6 +60,10 @@ systemctl --user enable --now software-update-check.timer
 The timer checks a few minutes after you sign in and around 10:00 each day in your local time zone. Click the notification to open the updater and choose which updates to install. To turn off reminders, run `systemctl --user disable --now software-update-check.timer`.
 
 ## Upgrade or uninstall the updater
+
+For a DEB installation, download the new `software-update-center.deb` and run `sudo apt install ./software-update-center.deb` from the download directory again. To uninstall the DEB, close the updater, turn off reminders if enabled, and run `sudo apt remove software-update-center`.
+
+The steps below apply to installations made with `setup.sh`.
 
 For a Git checkout, run `git pull --ff-only` and then `./setup.sh` from the source directory. For a ZIP installation, download and extract the new archive, then run `bash setup.sh`. Close and reopen the updater to load the new version.
 
