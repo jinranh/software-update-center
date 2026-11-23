@@ -1,7 +1,6 @@
 # 软件更新
 
-[![简体中文](https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-%E5%BD%93%E5%89%8D%E8%AF%AD%E8%A8%80-555555?style=for-the-badge)](README.md)
-[![English](https://img.shields.io/badge/Read%20in-English-0969da?style=for-the-badge)](README.en.md)
+**简体中文** · [English →](README.en.md)
 
 在一个窗口里检查、选择并升级 Ubuntu 上通过 APT 管理的桌面应用。安装前可以预览依赖变化。批量下载失败时，工具会逐项处理，复用已经下载的安装包，并在列表中标出可重试的应用。
 

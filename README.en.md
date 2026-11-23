@@ -1,7 +1,6 @@
 # Software Update Center
 
-[![简体中文](https://img.shields.io/badge/%E9%98%85%E8%AF%BB-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-0969da?style=for-the-badge)](README.md)
-[![English](https://img.shields.io/badge/English-Current%20language-555555?style=for-the-badge)](README.en.md)
+[← 简体中文](README.md) · **English**
 
 Check, select, and upgrade APT-managed desktop apps on Ubuntu from one window. Preview dependency changes before installing. If a batch download fails, the updater tries the selected apps individually, reuses cached packages, and marks apps you can retry.
 
