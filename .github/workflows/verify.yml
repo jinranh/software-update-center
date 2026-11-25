@@ -2,8 +2,18 @@ name: Verify Ubuntu 22.04
 
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!gh-pages']
+    paths: &regression_paths
+      - '**.py'
+      - check.conf
+      - setup.sh
+      - 'desktop/**'
+      - 'tests/**'
+      - 'packaging/**'
+      - .github/workflows/verify.yml
+      - '!**.md'
   pull_request:
+    paths: *regression_paths
 
 permissions:
   contents: read
